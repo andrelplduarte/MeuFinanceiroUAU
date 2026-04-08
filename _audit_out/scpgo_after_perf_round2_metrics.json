@@ -1,0 +1,27 @@
+{
+  "rows_consolidado": 1338,
+  "sum_vl_pago": 26838506.68,
+  "sum_vl_vencer": 11750684.9,
+  "sum_vl_encargos": 148315.40000000002,
+  "identity_cart_saldo_aberto_fail": 0,
+  "pct_close_100_fail": 3,
+  "pendencias_exists": true,
+  "analitico_exists": true,
+  "merges": 5,
+  "freeze": "A9",
+  "filter": "A8:Z1346",
+  "vendas": {
+    "852": {
+      "Vl.Carteira": 31339.51,
+      "Status": "INADIMPLENTE"
+    },
+    "111": {
+      "Vl.Carteira": 3154.62,
+      "Status": "INADIMPLENTE"
+    },
+    "1446": {
+      "Vl.Carteira": 39744.06,
+      "Status": "INADIMPLENTE"
+    }
+  }
+}

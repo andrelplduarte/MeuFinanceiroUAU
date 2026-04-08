@@ -1,0 +1,3 @@
+Relatório de Estoque UAU — linha só-estoque (sem par financeiro no lote de teste)
+Obra	Identificador	Status	Motivo	Venda	Status da construção	Valores
+12/LTMAG	QUADRA 01/ LOTE 01	DISPONÍVEL	stand		—	0

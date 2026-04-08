@@ -1,0 +1,36 @@
+{
+  "rows_consolidado": 1340,
+  "sum_vl_pago": 26901907.61,
+  "sum_vl_vencer": 16378695.53,
+  "sum_vl_encargos": 285952.44,
+  "maxdiff_vl_carteira": 1.4551915228366852e-11,
+  "fail_pct_100": 3,
+  "empreendimento_preenchido": 1340,
+  "b1": "SCP RESIDENCIAL GOIANIA",
+  "pend_header_excel_row": 5,
+  "pend_data_excel_row": 6,
+  "pend_aux_non_zero_rows": {
+    "__VL_PARC_PAGAS": 71,
+    "__VL_PARC_INADIMPLENTES": 25,
+    "__VL_PARC_A_VENCER": 68,
+    "__VL_SALDO": 21,
+    "__QTD_PARC_PAGAS": 71,
+    "__QTD_PARC_INADIMPLENTES": 25,
+    "__QTD_PARC_A_VENCER": 68,
+    "__QTD_SALDO": 21
+  },
+  "vendas": {
+    "852": {
+      "Vl.Carteira": 115517.18,
+      "Status venda": "INADIMPLENTE"
+    },
+    "111": {
+      "Vl.Carteira": 42483.09,
+      "Status venda": "INADIMPLENTE"
+    },
+    "1446": {
+      "Vl.Carteira": 42096.58,
+      "Status venda": "INADIMPLENTE"
+    }
+  }
+}

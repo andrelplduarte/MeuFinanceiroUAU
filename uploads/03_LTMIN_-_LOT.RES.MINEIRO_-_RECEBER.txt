@@ -1,0 +1,68 @@
+SPE SUL PAR  I LTDA	Quarta-feira, 1 de abril de 2026
+ANDREDUA
+Contas a Receber
+Per odo por Vencimento:	01/01/2001	a	31/12/2060
+
+Emp/Obra	Venda	Cliente	Unidades	Tipo	Parcela	Vencimento	Venc. Pror.	Principal	Corre  o	Juros Atraso	Multa Atraso	Vlr. Parcela
+
+Total por Cliente:	Cliente	0,00	0,00	0,00	0,00	0,00
+Total no per odo:	01/01/2001	a	31/12/2060	0,00	0,00	0,00	0,00	0,00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+UAU! Software de Automa  o e Gest o Empresarial	P gina	1

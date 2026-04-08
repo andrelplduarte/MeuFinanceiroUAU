@@ -1,0 +1,3 @@
+Relatório de Estoque UAU — validação automática
+Obra	Identificador	Status	Motivo	Venda	Status da construção	Valores
+71/ALVLT	QUADRA 21/ LOTE 30	VENDIDO	comercial	224	Em obra	0
