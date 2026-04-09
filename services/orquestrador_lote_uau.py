@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 """
-OrquestraÃ§Ã£o em lote acima do motor processar_e_gerar_excel.
-NÃ£o altera regras financeiras â€” apenas funde TXT, agrupa por empreendimento e compÃµe workbooks.
+Orquestração em lote acima do motor processar_e_gerar_excel.
+Não altera regras financeiras — apenas funde TXT, agrupa por empreendimento e compõe workbooks.
 """
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ from services.processador_uau import (
 
 MODO_POR_EMPREENDIMENTO = "POR_EMPREENDIMENTO"
 
-# Nome de exibiÃ§Ã£o da aba consolidada em CARTEIRAS GERAL.xlsx (lote por empreendimento).
-# Chave = sigla normalizada (maiÃºsculas). Ausente na tabela â†’ fallback "<SIGLA> â€“ CONSOLIDADO".
+# Nome de exibição da aba consolidada em CARTEIRAS GERAL.xlsx (lote por empreendimento).
+# Chave = sigla normalizada (maiúsculas). Ausente na tabela → fallback "<SIGLA> – CONSOLIDADO".
 MAPA_TITULO_ABA_CONSOLIDADO_LOTE: Dict[str, str] = {
     "NVLOT": "NVLOT.NIL.VELOSO.RVD-GO",
     "LTMAG": "LTMAG.MAGALHAES.MAB-PA",
@@ -68,23 +68,28 @@ def _titulo_aba_consolidado_carteiras_geral(sigla: str) -> str:
     k = str(sigla or "").strip().upper()
     if k in MAPA_TITULO_ABA_CONSOLIDADO_LOTE:
         return MAPA_TITULO_ABA_CONSOLIDADO_LOTE[k]
-    return f"{sigla} â€“ CONSOLIDADO"
+    return f"{sigla} – CONSOLIDADO"
 
 
 def aba_e_consolidado_carteiras_geral(nome_aba: str) -> bool:
-    """True se o tÃ­tulo Ã© aba consolidada por empreendimento (nome oficial ou fallback)."""
+    """True se o título é aba consolidada por empreendimento (nome oficial ou fallback)."""
     s = str(nome_aba or "").strip()
     if not s:
         return False
     up = s.upper()
-    if up.endswith("â€“ CONSOLIDADO") or up.endswith("- CONSOLIDADO"):
+    # Aceita hífen ASCII, travessão (U+2013) e sufixo legado com caracteres corrompidos em versões antigas.
+    if (
+        up.endswith("- CONSOLIDADO")
+        or up.endswith("– CONSOLIDADO")
+        or up.endswith("â€“ CONSOLIDADO")
+    ):
         return True
     return s in MAPA_TITULO_ABA_CONSOLIDADO_LOTE.values()
 
 
-# Prefixos genÃ©ricos no nome do arquivo que nÃ£o sÃ£o sigla de obra (ex.: REC_*, RECEBER_*).
-# Se o primeiro segmento for sÃ³ isso, o regex antigo colapsava todo o lote numa Ãºnica chave "REC".
-# REC/REB/EST/UPL: prefixos tÃ©cnicos do app ao salvar uploads (rec_/reb_/est_/upl_ + Ã­ndice).
+# Prefixos genéricos no nome do arquivo que não são sigla de obra (ex.: REC_*, RECEBER_*).
+# Se o primeiro segmento for só isso, o regex antigo colapsava todo o lote numa única chave "REC".
+# REC/REB/EST/UPL: prefixos técnicos do app ao salvar uploads (rec_/reb_/est_/upl_ + índice).
 _PREFIXOS_NAO_SIGLA = frozenset(
     {
         "REC",
@@ -111,7 +116,7 @@ _PREFIXOS_NAO_SIGLA = frozenset(
     }
 )
 
-# PadrÃ£o app.py: <prefixo>_<Ã­ndice>_<nome original...>
+# Padrão app.py: <prefixo>_<índice>_<nome original...>
 _RE_PREFIXO_UPLOAD_APP = re.compile(r"^(REC|REB|EST|UPL)_\d+_", re.IGNORECASE)
 
 
@@ -121,7 +126,7 @@ def _sigla_curta_do_caminho(caminho: str) -> str:
         b = os.path.basename(str(caminho or "")).upper()
     except Exception:
         b = ""
-    # Uploads Flask: 00_SCPGO_-LOT... â†’ ignorar prefixo numÃ©rico
+    # Uploads Flask: 00_SCPGO_-LOT... → ignorar prefixo numérico
     b = re.sub(r"^\d+_", "", b)
     # reb_00_ALVLT_... / rec_03_CIDAN_... (repetir: encadeamentos raros rec_/reb_ no nome)
     for _ in range(4):
@@ -130,7 +135,7 @@ def _sigla_curta_do_caminho(caminho: str) -> str:
             break
         b = nb
     base_sem_ext = os.path.splitext(b)[0]
-    # Preferir o primeiro token alfanumÃ©rico que nÃ£o seja prefixo de ruÃ­do (evita REC, RECEBER, LOTâ€¦).
+    # Preferir o primeiro token alfanumérico que não seja prefixo de ruído (evita REC, RECEBER, LOT...).
     partes = [p for p in re.split(r"[_\-\s]+", base_sem_ext) if p]
     for raw in partes:
         token = sanitizar_nome_arquivo(raw.split(".")[0])
@@ -152,9 +157,9 @@ def _sigla_curta_do_caminho(caminho: str) -> str:
 
 def _chave_pareamento_por_prefixo_arquivo(caminho: str) -> str:
     """
-    Pareamento estÃ¡vel no modo por empreendimento: mesma sigla no nome do arquivo
-    (Receber e Recebidos do mesmo cÃ³digo, ex. LTMIN / LTMIN).
-    Se nÃ£o houver sigla reconhecÃ­vel, cai no agrupamento por nome canÃ´nico do TXT.
+    Pareamento estável no modo por empreendimento: mesma sigla no nome do arquivo
+    (Receber e Recebidos do mesmo código, ex. LTMIN / LTMIN).
+    Se não houver sigla reconhecível, cai no agrupamento por nome canônico do TXT.
     """
     s = _sigla_curta_do_caminho(caminho)
     if s and s != "EMP":
@@ -171,7 +176,7 @@ def _diagnostico_pareamento_basename_chave(caminhos: Sequence[str], limite: int 
         ch = _chave_pareamento_por_prefixo_arquivo(str(p or ""))
         linhas.append(f"  {bn}->{ch}")
     if n > limite:
-        linhas.append(f"  â€¦ (+{n - limite} arquivo(s) nÃ£o listados)")
+        linhas.append(f"  … (+{n - limite} arquivo(s) não listados)")
     return "\n".join(linhas) if linhas else "  (nenhum arquivo)"
 
 
@@ -188,30 +193,30 @@ def _validar_tipo_arquivo(caminho: str, esperado: str, campo: str) -> None:
     tipo = identificar_tipo_relatorio_uau_por_texto(texto)
     if esperado == "RECEBER" and tipo != "RECEBER":
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o de entrada",
+            etapa="validação de entrada",
             funcao="orquestrador_lote_uau",
-            validacao="tipo de relatÃ³rio",
-            mensagem=f"Arquivo em {campo} nÃ£o foi reconhecido como Contas a Receber: {os.path.basename(caminho)}",
+            validacao="tipo de relatório",
+            mensagem=f"Arquivo em {campo} não foi reconhecido como Contas a Receber: {os.path.basename(caminho)}",
             campo_ou_aba=campo,
         )
     if esperado == "RECEBIDOS" and tipo != "RECEBIDOS":
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o de entrada",
+            etapa="validação de entrada",
             funcao="orquestrador_lote_uau",
-            validacao="tipo de relatÃ³rio",
-            mensagem=f"Arquivo em {campo} nÃ£o foi reconhecido como Contas Recebidas: {os.path.basename(caminho)}",
+            validacao="tipo de relatório",
+            mensagem=f"Arquivo em {campo} não foi reconhecido como Contas Recebidas: {os.path.basename(caminho)}",
             campo_ou_aba=campo,
         )
     if not _estrutura_minima_uau_ok(texto, esperado):
         msg = (
-            "Estrutura mÃ­nima incompatÃ­vel (Contas a Receber)."
+            "Estrutura mínima incompatível (Contas a Receber)."
             if esperado == "RECEBER"
-            else "Estrutura mÃ­nima incompatÃ­vel (Contas Recebidas)."
+            else "Estrutura mínima incompatível (Contas Recebidas)."
         )
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o de entrada",
+            etapa="validação de entrada",
             funcao="orquestrador_lote_uau",
-            validacao="estrutura mÃ­nima",
+            validacao="estrutura mínima",
             mensagem=f"{msg} Arquivo: {os.path.basename(caminho)}",
             campo_ou_aba=campo,
         )
@@ -244,7 +249,7 @@ def _remover_seguro(path: str) -> None:
 
 
 def _resolver_estoque_unificado_lote(caminhos_est: Sequence[str], temporarios: List[str]) -> str | None:
-    """Funde vÃ¡rios TXT de estoque num Ãºnico ficheiro temporÃ¡rio (modo unificado / par Ãºnico com N estoques)."""
+    """Funde vários TXT de estoque num único ficheiro temporário (modo unificado / par único com N estoques)."""
     paths = [os.path.abspath(os.path.normpath(p)) for p in (caminhos_est or []) if p]
     if not paths:
         return None
@@ -259,8 +264,8 @@ def _resolver_estoque_por_chave_lote(
     chave: str, caminhos_est: Sequence[str], temporarios: List[str]
 ) -> str | None:
     """
-    Um ficheiro de estoque â†’ aplicado a todos os grupos.
-    VÃ¡rios ficheiros â†’ agrupa pela mesma chave de prefixo do nome (paralelo ao Receber/Recebidos).
+    Um ficheiro de estoque → aplicado a todos os grupos.
+    Vários ficheiros → agrupa pela mesma chave de prefixo do nome (paralelo ao Receber/Recebidos).
     """
     paths = [os.path.abspath(os.path.normpath(p)) for p in (caminhos_est or []) if p]
     if not paths:
@@ -281,14 +286,14 @@ def _resolver_estoque_por_chave_lote(
 
 
 def _data_base_de_primeiro_xlsx_motor(caminho: str):
-    """LÃª B2 do painel do Consolidado no workbook gerado pelo motor."""
+    """Lê B2 do painel do Consolidado no workbook gerado pelo motor."""
     if not caminho or not os.path.isfile(caminho):
         return None
     wb = None
     try:
         wb = load_workbook(caminho, data_only=True)
         for nm in wb.sheetnames:
-            su = str(nm).upper().replace("Ã", "I")
+            su = str(nm).upper().replace("Í", "I")
             if "CONSOLIDADO" in su and "CRIT" not in su:
                 v = wb[nm]["B2"].value
                 if isinstance(v, datetime):
@@ -313,7 +318,7 @@ def _data_base_de_primeiro_xlsx_motor(caminho: str):
 def _mapear_titulo_aba_por_empreendimento(nome_original: str, sigla: str) -> str:
     n = str(nome_original or "").strip()
     nu = n.upper()
-    if nu == "CRITÃ‰RIOS" or nu == "CRITERIOS" or nu == "CRITERIOS ANALISES":
+    if nu == "CRITÉRIOS" or nu == "CRITERIOS" or nu == "CRITERIOS ANALISES":
         return "CRITERIOS ANALISES"
     if "CONSOLIDADO" in nu and "CRIT" not in nu:
         return _titulo_aba_consolidado_carteiras_geral(sigla)
@@ -325,7 +330,7 @@ def _mapear_titulo_aba_por_empreendimento(nome_original: str, sigla: str) -> str
         return f"PEND.PARCELAS - {sigla}"
     if n == "RELATORIO ANALITICO" or "RELATORIO" in nu:
         return f"RELATORIO ANALITICO - {sigla}"
-    return f"{sigla} â€“ {n}"
+    return f"{sigla} – {n}"
 
 
 def _titulo_aba_unico(_wb: Workbook, titulo: str, usados: set) -> str:
@@ -382,9 +387,9 @@ def _copiar_planilha_estilizada(ws_src, wb_dst, titulo: str):
 
 
 def _nome_aba_consolidado_motor(wb) -> str | None:
-    """Aba gerencial por obra (exclui estoque e critÃ©rios)."""
+    """Aba gerencial por obra (exclui estoque e critérios)."""
     for s in wb.sheetnames:
-        su = str(s).upper().replace("Ã", "I")
+        su = str(s).upper().replace("Í", "I")
         if "CONSOLIDADO" in su and "CRIT" not in su and "ESTOQUE" not in su:
             return s
     return None
@@ -393,7 +398,7 @@ def _nome_aba_consolidado_motor(wb) -> str | None:
 def _anexar_somente_consolidado_por_sigla(
     wb_dest: Workbook, caminho_xlsx: str, sigla: str, titulos_usados: set
 ) -> None:
-    """No lote por empreendimento: sÃ³ a aba consolidada da obra entra separada no workbook final."""
+    """No lote por empreendimento: só a aba consolidada da obra entra separada no workbook final."""
     wb = load_workbook(caminho_xlsx, data_only=False)
     try:
         nome = _nome_aba_consolidado_motor(wb)
@@ -407,7 +412,7 @@ def _anexar_somente_consolidado_por_sigla(
 
 
 def _ler_df_aba_xlsx_motor(caminho: str, nome_aba: str, header_row_0based: int) -> pd.DataFrame:
-    """LÃª aba jÃ¡ formatada pelo motor (cabeÃ§alho tabular na linha Excel = header_row_0based + 1)."""
+    """Lê aba já formatada pelo motor (cabeçalho tabular na linha Excel = header_row_0based + 1)."""
     if not caminho or not os.path.isfile(caminho):
         return pd.DataFrame()
     sinais = {"EMP_OBRA", "VENDA", "CLIENTE", "PARCELA", "PARC_NUM", "PARC_TOTAL", "DATA_REC", "VENCIMENTO"}
@@ -451,7 +456,7 @@ def _ler_df_aba_xlsx_motor(caminho: str, nome_aba: str, header_row_0based: int) 
         elif alvo == "PENDENCIAS_PARCELAS" or alvo == "PEND.PARCELAS":
             aliases.update({"PEND.PARCELAS", "PENDENCIAS_PARCELAS", "PENDENCIAS_PARCELAS".title(), "Pendencias_Parcelas"})
         elif alvo == "CRITERIOS" or alvo == "CRITERIOS ANALISES":
-            aliases.update({"CRITERIOS ANALISES", "CRITERIOS", "CRITÃ‰RIOS", "CRITERIOS".title(), "CritÃ©rios"})
+            aliases.update({"CRITERIOS ANALISES", "CRITERIOS", "CRITÉRIOS", "CRITERIOS".title(), "Critérios"})
         for sn in xl.sheet_names:
             su = str(sn or "").strip().upper()
             if su in aliases:
@@ -780,8 +785,8 @@ def processar_lote_uau(
     progresso_cb=None,
 ) -> Tuple[Tuple[str, str], float]:
     """
-    Entrada: listas de caminhos absolutos jÃ¡ salvos em disco.
-    SaÃ­da: ((caminho_xlsx_principal, caminho_xlsx_base_opcional), tempo_total_segundos).
+    Entrada: listas de caminhos absolutos já salvos em disco.
+    Saída: ((caminho_xlsx_principal, caminho_xlsx_base_opcional), tempo_total_segundos).
     """
     def _emitir_progresso(**payload):
         if callable(progresso_cb):
@@ -805,7 +810,7 @@ def processar_lote_uau(
     cp = [os.path.abspath(os.path.normpath(p)) for p in caminhos_recebidos if p]
     if len(cr) < 1 or len(cp) < 1:
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o",
+            etapa="validação",
             funcao="processar_lote_uau",
             validacao="arquivos insuficientes",
             mensagem="Envie ao menos um TXT em Contas a Receber e outro em Contas Recebidas.",
@@ -817,20 +822,20 @@ def processar_lote_uau(
         modo = MODO_POR_EMPREENDIMENTO
     else:
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o",
+            etapa="validação",
             funcao="processar_lote_uau",
-            validacao="modo de geraÃ§Ã£o",
-            mensagem="Modo de geraÃ§Ã£o invÃ¡lido. Use POR_EMPREENDIMENTO.",
+            validacao="modo de geração",
+            mensagem="Modo de geração inválido. Use POR_EMPREENDIMENTO.",
             campo_ou_aba="modo_geracao",
         )
 
     todos = set(cr) | set(cp)
     if len(todos) < len(cr) + len(cp):
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o",
+            etapa="validação",
             funcao="processar_lote_uau",
             validacao="arquivos duplicados",
-            mensagem="HÃ¡ caminhos duplicados entre os anexos. Remova duplicatas.",
+            mensagem="Há caminhos duplicados entre os anexos. Remova duplicatas.",
             campo_ou_aba="upload",
         )
 
@@ -859,20 +864,20 @@ def processar_lote_uau(
         amostra_r = ", ".join(sorted(list(grupos_r.keys()))[:8]) if grupos_r else "nenhuma"
         amostra_p = ", ".join(sorted(list(grupos_p.keys()))[:8]) if grupos_p else "nenhuma"
         aux_pareamento = (
-            "Amostra basename->chave extraÃ­da (mÃ¡x. 5 por lado):\n"
+            "Amostra basename->chave extraída (máx. 5 por lado):\n"
             "Receber:\n"
             f"{_diagnostico_pareamento_basename_chave(cr)}\n"
             "Recebidos:\n"
             f"{_diagnostico_pareamento_basename_chave(cp)}\n"
-            f"Chaves agregadas â€” Receber: {sorted(grupos_r.keys())} | Recebidos: {sorted(grupos_p.keys())}"
+            f"Chaves agregadas — Receber: {sorted(grupos_r.keys())} | Recebidos: {sorted(grupos_p.keys())}"
         )
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o",
+            etapa="validação",
             funcao="processar_lote_uau",
             validacao="pareamento por empreendimento",
             mensagem=(
-                "NÃ£o foi possÃ­vel parear Contas a Receber e Contas Recebidas pelo mesmo empreendimento. "
-                "Verifique se cada empreendimento tem um par de arquivos (nomes/cabeÃ§alhos coerentes). "
+                "Não foi possível parear Contas a Receber e Contas Recebidas pelo mesmo empreendimento. "
+                "Verifique se cada empreendimento tem um par de arquivos (nomes/cabeçalhos coerentes). "
                 f"Chaves detectadas em Receber: [{amostra_r}] | "
                 f"Chaves detectadas em Recebidos: [{amostra_p}]"
             ),
@@ -889,15 +894,15 @@ def processar_lote_uau(
         if apenas_p:
             msg_extra.append(f"Somente Recebidos: {', '.join(list(apenas_p)[:5])}")
         aux_pareamento = (
-            "Amostra basename->chave extraÃ­da (mÃ¡x. 5 por lado):\n"
+            "Amostra basename->chave extraída (máx. 5 por lado):\n"
             "Receber:\n"
             f"{_diagnostico_pareamento_basename_chave(cr)}\n"
             "Recebidos:\n"
             f"{_diagnostico_pareamento_basename_chave(cp)}\n"
-            f"Chaves agregadas â€” Receber: {sorted(grupos_r.keys())} | Recebidos: {sorted(grupos_p.keys())}"
+            f"Chaves agregadas — Receber: {sorted(grupos_r.keys())} | Recebidos: {sorted(grupos_p.keys())}"
         )
         raise ProcessamentoUAUErro(
-            etapa="validaÃ§Ã£o",
+            etapa="validação",
             funcao="processar_lote_uau",
             validacao="pareamento por empreendimento",
             mensagem="Empreendimentos sem par completo. " + " | ".join(msg_extra),
@@ -1083,7 +1088,7 @@ def processar_lote_uau(
                 aplicar_estilo_arquivo_so_aba_resumo_geral(
                     tmp_resumo,
                     db0,
-                    "LOTE â€” TODOS OS EMPREENDIMENTOS",
+                    "LOTE — TODOS OS EMPREENDIMENTOS",
                 )
                 wb_r = load_workbook(tmp_resumo)
                 try:
@@ -1145,7 +1150,7 @@ def processar_lote_uau(
             total_empreendimentos=len(chaves_ok),
             concluidos=len(chaves_ok),
             empreendimento_atual=None,
-            item_atual_abas="DOWNLOAD DISPONÃVEL",
+            item_atual_abas="DOWNLOAD DISPONÍVEL",
             abas_item=["CARTEIRAS GERAL", "CARTEIRAS BANCO DE DADOS"],
             itens_tempo=tempos_por_item,
             tempo_decorrido_segundos=round(max(0.0, time.perf_counter() - t0), 2),
@@ -1172,8 +1177,8 @@ def processar_entrada_simples_ou_lote(
     progresso_cb=None,
 ) -> Tuple[str | Tuple[str, str], float]:
     """
-    CompatÃ­vel com fluxo antigo: 1+1 arquivos.
-    Se um arquivo em cada lista e modo None ou vazio â†’ delega ao processar_e_gerar_excel original.
+    Compatível com fluxo antigo: 1+1 arquivos.
+    Se um arquivo em cada lista e modo None ou vazio → delega ao processar_e_gerar_excel original.
     """
     cr = [p for p in caminhos_receber if p]
     cp = [p for p in caminhos_recebidos if p]
@@ -1201,7 +1206,7 @@ def processar_entrada_simples_ou_lote(
             for p in tmp_est_par:
                 _remover_seguro(p)
     if len(cr) == 1 and len(cp) == 1 and modo:
-        # Um par explÃ­cito com modo: usa o fluxo de lote POR_EMPREENDIMENTO.
+        # Um par explícito com modo: usa o fluxo de lote POR_EMPREENDIMENTO.
         return processar_lote_uau(
             cr,
             cp,
@@ -1213,10 +1218,10 @@ def processar_entrada_simples_ou_lote(
     if len(cr) >= 1 and len(cp) >= 1:
         if not modo:
             raise ProcessamentoUAUErro(
-                etapa="validaÃ§Ã£o",
+                etapa="validação",
                 funcao="processar_entrada_simples_ou_lote",
-                validacao="modo de geraÃ§Ã£o",
-                mensagem="Com vÃ¡rios arquivos, selecione o modo: Por empreendimento.",
+                validacao="modo de geração",
+                mensagem="Com vários arquivos, selecione o modo: Por empreendimento.",
                 campo_ou_aba="modo_geracao",
             )
         return processar_lote_uau(
@@ -1228,9 +1233,9 @@ def processar_entrada_simples_ou_lote(
             progresso_cb=progresso_cb,
         )
     raise ProcessamentoUAUErro(
-        etapa="validaÃ§Ã£o",
+        etapa="validação",
         funcao="processar_entrada_simples_ou_lote",
         validacao="arquivos",
-        mensagem="Envie os arquivos TXT necessÃ¡rios.",
+        mensagem="Envie os arquivos TXT necessários.",
         campo_ou_aba="upload",
     )
