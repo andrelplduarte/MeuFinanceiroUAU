@@ -414,7 +414,14 @@ def _aplicar_mapa_venda_em_merged(merged: pd.DataFrame, mapa_v: dict[str, dict])
             continue
         for k, val in fin.items():
             if k in merged.columns:
-                merged.at[i, k] = val
+                try:
+                    merged.at[i, k] = val
+                except (TypeError, ValueError):
+                    if pd.api.types.is_integer_dtype(merged[k]):
+                        merged[k] = merged[k].astype("float64")
+                    else:
+                        merged[k] = merged[k].astype("object")
+                    merged.at[i, k] = val
         altered.add(i)
     return altered
 
@@ -727,9 +734,17 @@ def montar_dataframe_consolidado_estoque(
     ex = pd.DataFrame(linhas)
     if ex.empty:
         return out_empty
-    # Ordenar: maior % de vencido para menor.
+    ex["EMP/OBRA"] = ex["EMP/OBRA"].fillna("").astype(str).str.strip()
+    ex["EMPREENDIMENTO"] = ex["EMPREENDIMENTO"].fillna("").astype(str).str.strip()
+    ex["IDENTIFICADOR"] = ex["IDENTIFICADOR"].fillna("").astype(str).str.strip()
+    ex["VENDA"] = ex["VENDA"].fillna("").astype(str).str.strip()
+    ex["CLIENTE"] = ex["CLIENTE"].fillna("").astype(str).str.strip()
+    ex["STATUS CONSTRUÇÃO"] = ex["STATUS CONSTRUÇÃO"].fillna("").astype(str).str.strip().replace("", "N/A")
+
+    # Ordenação estável para consistência entre execuções (sem alterar classificação financeira).
     ex = ex.sort_values(
-        by=["% VENCIDO", "QTD.VENCIDA", "IDENTIFICADOR"],
-        ascending=[False, False, True],
+        by=["% VENCIDO", "QTD.VENCIDA", "EMP/OBRA", "IDENTIFICADOR", "VENDA"],
+        ascending=[False, False, True, True, True],
+        kind="mergesort",
     )
     return ex[COLUNAS_SAIDA_CONSOLIDADO_ESTOQUE].reset_index(drop=True)

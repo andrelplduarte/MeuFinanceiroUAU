@@ -11,7 +11,10 @@ from openpyxl import load_workbook
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
-from services.orquestrador_lote_uau import processar_lote_uau  # noqa: E402
+from services.orquestrador_lote_uau import (  # noqa: E402
+    aba_e_consolidado_carteiras_geral,
+    processar_lote_uau,
+)
 
 CR = [
     os.path.join(BASE, "uploads", "ALVLT_-_LOT.SPE_RESIDENCIAL_OURILANDIA_-_RECEBER.txt"),
@@ -27,14 +30,7 @@ EST = [
     os.path.join(BASE, "validacao_lote_estoque", "99_LTMAG_ORFAO_ESTOQUE.txt"),
 ]
 
-ABAS_BASE_ESPERADAS = [
-    "DADOS RECEBER",
-    "DADOS RECEBIDOS",
-    "DADOS GERAL",
-    "PEND.PARCELAS",
-    "CONSOLIDADO ESTOQUE",
-    "CRITERIOS ANALISES",
-]
+ABAS_BASE_ESPERADAS = ["DADOS_RECEBER", "DADOS_RECEBIDOS"]
 
 
 def _sigla_da_aba(nome_aba: str) -> str:
@@ -57,7 +53,7 @@ def _validar_arquivo_geral(caminho: str) -> bool:
     print(f"Total de abas: {len(abas)}")
     print(f"Abas: {abas}")
     ok_primeira = bool(abas) and abas[0] == "RESUMO GERAL"
-    ok_demais = all("CONSOLIDADO" in a.upper() for a in abas[1:])
+    ok_demais = all(aba_e_consolidado_carteiras_geral(a) for a in abas[1:])
     print(f"Primeira aba = RESUMO GERAL: {ok_primeira}")
     print(f"Demais abas são consolidados: {ok_demais}")
     print(f"Siglas nos consolidados: {[_sigla_da_aba(a) for a in abas[1:]]}")
@@ -72,13 +68,19 @@ def _validar_arquivo_base(caminho: str) -> bool:
     if not existe:
         return False
     wb = load_workbook(caminho, read_only=True, data_only=True)
-    abas = wb.sheetnames
+    abas = list(wb.sheetnames)
     wb.close()
     print(f"Total de abas: {len(abas)}")
     print(f"Abas: {abas}")
-    ok_exatas = abas == ABAS_BASE_ESPERADAS
-    print(f"Abas exatas esperadas: {ok_exatas}")
-    return ok_exatas
+    ok = abas == ABAS_BASE_ESPERADAS
+    if not ok:
+        print(
+            "FALHA: a base deve ter exatamente duas abas, nesta ordem: "
+            "DADOS_RECEBER, DADOS_RECEBIDOS."
+        )
+    else:
+        print("Abas da base conferem com o schema atual (DADOS_RECEBER, DADOS_RECEBIDOS).")
+    return ok
 
 
 def main() -> None:

@@ -1,0 +1,35 @@
+# Python cache/bytecode
+__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Auditorias locais / métricas ad hoc (não versionar)
+_audit_out/
+
+# Runtime uploads and generated reports (operational artifacts)
+uploads/
+outputs/_tmp_lote_uau/
+outputs/_progress/
+outputs/validacao_evidencias/
+outputs/validacao_por/
+outputs/validacao_run/
+outputs/*.xlsx
+outputs/*.csv
+outputs/*.tmp
+
+# Local ad-hoc notes/logs
+*.log
+2026-*.md
+2026-*.txt

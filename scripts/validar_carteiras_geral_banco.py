@@ -12,28 +12,16 @@ from openpyxl import load_workbook
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+from services.orquestrador_lote_uau import aba_e_consolidado_carteiras_geral  # noqa: E402
+
 OUT_DIR = os.path.join(BASE_DIR, "outputs")
 PATH_GERAL = os.path.join(OUT_DIR, "CARTEIRAS GERAL.xlsx")
 PATH_BASE = os.path.join(OUT_DIR, "CARTEIRAS BANCO DE DADOS.xlsx")
 PATH_PROCESSADOR = os.path.join(BASE_DIR, "services", "processador_uau.py")
 
-ABAS_BASE_ESPERADAS = [
-    "DADOS RECEBER",
-    "DADOS RECEBIDOS",
-    "DADOS GERAL",
-    "PEND.PARCELAS",
-    "CONSOLIDADO ESTOQUE",
-    "CRITERIOS ANALISES",
-]
-
-HEADER_BASE_MAP = {
-    "DADOS RECEBER": 6,
-    "DADOS RECEBIDOS": 6,
-    "DADOS GERAL": 7,
-    "PEND.PARCELAS": 4,
-    "CONSOLIDADO ESTOQUE": 18,
-    "CRITERIOS ANALISES": 0,
-}
+# Base opcional (SQL-like): exatamente estas duas abas, nesta ordem, cabeçalho na linha 1.
+ABAS_BASE_ESPERADAS = ["DADOS_RECEBER", "DADOS_RECEBIDOS"]
 
 
 def _sha256_arquivo(path: str) -> str:
@@ -53,8 +41,7 @@ def _sigla_da_aba(nome_aba: str) -> str:
 
 
 def _eh_aba_consolidado(nome_aba: str) -> bool:
-    up = str(nome_aba or "").upper()
-    return up.endswith("– CONSOLIDADO") or up.endswith("- CONSOLIDADO")
+    return aba_e_consolidado_carteiras_geral(nome_aba)
 
 
 def _ler_df_com_header(path: str, aba: str, header_0based: int) -> pd.DataFrame:
@@ -166,18 +153,19 @@ def validar_carteiras_banco() -> Tuple[List[str], List[Tuple[str, int]]]:
 
     if abas != ABAS_BASE_ESPERADAS:
         erros.append(
-            "Abas de CARTEIRAS BANCO DE DADOS.xlsx divergem das 6 esperadas."
+            "CARTEIRAS BANCO DE DADOS.xlsx deve conter exatamente duas abas, nesta ordem: "
+            "DADOS_RECEBER, DADOS_RECEBIDOS. "
+            f"Encontrado: {abas}."
         )
 
-    for aba in ABAS_BASE_ESPERADAS:
-        if aba not in abas:
-            contagens.append((aba, -1))
+    for nome_aba in ABAS_BASE_ESPERADAS:
+        if nome_aba not in abas:
+            contagens.append((nome_aba, -1))
             continue
-        header_row = HEADER_BASE_MAP[aba]
-        df = _ler_df_com_header(PATH_BASE, aba, header_row)
-        contagens.append((aba, len(df)))
+        df = _ler_df_com_header(PATH_BASE, nome_aba, header_0based=0)
+        contagens.append((nome_aba, len(df)))
 
-    print("\nLinhas por aba (base):")
+    print("\nLinhas por aba (base, dados após cabeçalho):")
     for aba, n in contagens:
         print(f"- {aba}: {n}")
 

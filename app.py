@@ -1,6 +1,11 @@
-import os
+﻿import os
+import time
+import json
+import uuid
+import threading
+import shutil
 from datetime import datetime
-from flask import Flask, render_template, request, send_file, session, redirect, url_for
+from flask import Flask, render_template, request, send_file, session, redirect, url_for, abort, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
@@ -14,15 +19,59 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-meu-financeiro-uau-alte
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 OUTPUT_FOLDER = os.path.join(BASE_DIR, "outputs")
+PROGRESS_FOLDER = os.path.join(OUTPUT_FOLDER, "_progress")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(PROGRESS_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB (lote com vários TXT)
 
 EXTENSAO_PERMITIDA = ".txt"
+PROGRESS_TTL_SECONDS = 60 * 60 * 6
+_LOTE_PROGRESS_LOCK = threading.Lock()
+_LOTE_PROGRESS = {}
+
+
+def _arquivo_progresso(token: str) -> str:
+    nome = secure_filename((token or "").strip()) or "sem_token"
+    return os.path.join(PROGRESS_FOLDER, f"{nome}.json")
+
+
+def _salvar_progresso_em_arquivo(token: str, payload: dict):
+    if not token:
+        return
+    caminho = _arquivo_progresso(token)
+    tmp = f"{caminho}.tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+        os.replace(tmp, caminho)
+    except OSError:
+        app.logger.warning("Não foi possível persistir progresso do token %s", token)
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _ler_progresso_de_arquivo(token: str):
+    if not token:
+        return None
+    caminho = _arquivo_progresso(token)
+    if not os.path.isfile(caminho):
+        return None
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except (OSError, json.JSONDecodeError):
+        return None
+    return None
 
 
 def _formatar_tempo_mm_ss(segundos: float) -> str:
@@ -36,6 +85,66 @@ def _formatar_tempo_mm_ss(segundos: float) -> str:
 
 def _agora_str() -> str:
     return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _limpar_progresso_expirado():
+    agora = time.time()
+    with _LOTE_PROGRESS_LOCK:
+        expirados = [
+            k for k, v in _LOTE_PROGRESS.items()
+            if (agora - float(v.get("updated_at", agora))) > PROGRESS_TTL_SECONDS
+        ]
+        for k in expirados:
+            _LOTE_PROGRESS.pop(k, None)
+    try:
+        for nome in os.listdir(PROGRESS_FOLDER):
+            if not nome.lower().endswith(".json"):
+                continue
+            caminho = os.path.join(PROGRESS_FOLDER, nome)
+            if not os.path.isfile(caminho):
+                continue
+            try:
+                with open(caminho, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                updated_at = float((data or {}).get("updated_at") or 0)
+            except (OSError, json.JSONDecodeError, ValueError, TypeError):
+                updated_at = 0
+            if updated_at and (agora - updated_at) > PROGRESS_TTL_SECONDS:
+                try:
+                    os.remove(caminho)
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
+def _set_progresso(token: str, **campos):
+    if not token:
+        return
+    _limpar_progresso_expirado()
+    with _LOTE_PROGRESS_LOCK:
+        atual = dict(_LOTE_PROGRESS.get(token) or {})
+        atual.setdefault("token", token)
+        atual.update(campos)
+        atual["updated_at"] = time.time()
+        _LOTE_PROGRESS[token] = atual
+    _salvar_progresso_em_arquivo(token, atual)
+
+
+def _get_progresso(token: str):
+    if not token:
+        return None
+    _limpar_progresso_expirado()
+    with _LOTE_PROGRESS_LOCK:
+        item = _LOTE_PROGRESS.get(token)
+        if item:
+            return dict(item)
+    item_arquivo = _ler_progresso_de_arquivo(token)
+    if item_arquivo:
+        with _LOTE_PROGRESS_LOCK:
+            _LOTE_PROGRESS[token] = dict(item_arquivo)
+        return dict(item_arquivo)
+    return None
 
 
 def _estado_uploads():
@@ -52,6 +161,20 @@ def _persistir_estado_uploads(estado):
     session["upload_estoque"] = estado.get("estoque")
 
 
+def _limpar_lote_uploads(estado):
+    for item in list(estado.get("receber", [])):
+        _remover_arquivo_local(item.get("path"))
+    for item in list(estado.get("recebidos", [])):
+        _remover_arquivo_local(item.get("path"))
+    item_estoque = estado.get("estoque")
+    if item_estoque:
+        _remover_arquivo_local(item_estoque.get("path"))
+    estado["receber"] = []
+    estado["recebidos"] = []
+    estado["estoque"] = None
+    _persistir_estado_uploads(estado)
+
+
 def _remover_arquivo_local(caminho: str | None):
     if not caminho:
         return
@@ -60,6 +183,57 @@ def _remover_arquivo_local(caminho: str | None):
             os.remove(caminho)
     except OSError:
         app.logger.warning("Não foi possível remover arquivo local: %s", caminho)
+
+
+def _limpar_conteudo_diretorio(pasta: str) -> tuple[int, int]:
+    """Remove todos os itens dentro da pasta (sem remover a própria pasta)."""
+    removidos = 0
+    erros = 0
+    try:
+        os.makedirs(pasta, exist_ok=True)
+        for nome in os.listdir(pasta):
+            caminho = os.path.join(pasta, nome)
+            try:
+                if os.path.isdir(caminho):
+                    shutil.rmtree(caminho, ignore_errors=False)
+                else:
+                    os.remove(caminho)
+                removidos += 1
+            except OSError:
+                erros += 1
+    except OSError:
+        erros += 1
+    return removidos, erros
+
+
+def _ha_processamento_ativo() -> bool:
+    """Evita limpeza de cache no meio de processamento em andamento."""
+    agora = time.time()
+    with _LOTE_PROGRESS_LOCK:
+        for item in _LOTE_PROGRESS.values():
+            status = str((item or {}).get("status") or "").strip().lower()
+            updated_at = float((item or {}).get("updated_at") or 0)
+            if status not in {"concluido", "erro", ""} and (agora - updated_at) < (60 * 30):
+                return True
+    try:
+        for nome in os.listdir(PROGRESS_FOLDER):
+            if not nome.lower().endswith(".json"):
+                continue
+            caminho = os.path.join(PROGRESS_FOLDER, nome)
+            if not os.path.isfile(caminho):
+                continue
+            try:
+                with open(caminho, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                status = str((data or {}).get("status") or "").strip().lower()
+                updated_at = float((data or {}).get("updated_at") or 0)
+                if status not in {"concluido", "erro", ""} and (agora - updated_at) < (60 * 30):
+                    return True
+            except (OSError, json.JSONDecodeError, ValueError, TypeError):
+                continue
+    except OSError:
+        return False
+    return False
 
 
 def _salvar_upload(arquivo, nome_salvo: str) -> str:
@@ -72,12 +246,19 @@ def _anexar_em_lista(estado, chave_lista: str, arquivos, rotulo: str):
     erros = []
     atual = list(estado.get(chave_lista, []))
     inicio = len(atual)
+    prefixo_por_lista = {
+        "receber": "rec",
+        "recebidos": "reb",
+        "estoque": "est",
+    }
+    prefixo = prefixo_por_lista.get(chave_lista, "upl")
+
     for idx, arq in enumerate(arquivos):
         nome_seguro, erro = validar_arquivo_enviado(arq, rotulo)
         if erro:
             erros.append(f"{rotulo} #{idx + 1}: {erro}")
             continue
-        nome_unico = f"{chave_lista[:3]}_{inicio + idx:02d}_{nome_seguro}"
+        nome_unico = f"{prefixo}_{inicio + idx:02d}_{nome_seguro}"
         caminho = _salvar_upload(arq, nome_unico)
         atual.append(
             {
@@ -133,6 +314,8 @@ def _detalhes_processamento_uau_erro(exc: ProcessamentoUAUErro):
 @app.route("/", methods=["GET", "POST"])
 def index():
     estado = _estado_uploads()
+    cache_notice = session.pop("cache_notice", None)
+    cache_notice_type = session.pop("cache_notice_type", "ok")
     if request.method == "POST":
         acao_raw = (request.form.get("acao") or "processar").strip().lower()
         acao = acao_raw
@@ -170,6 +353,10 @@ def index():
                 _remover_arquivo_local(item.get("path"))
             estado["estoque"] = None
             _persistir_estado_uploads(estado)
+            return redirect(url_for("index"))
+
+        if acao == "limpar_lote":
+            _limpar_lote_uploads(estado)
             return redirect(url_for("index"))
 
         if acao == "substituir_receber":
@@ -276,6 +463,54 @@ def index():
         caminho_abs_recebidos = [x.get("path") for x in estado["recebidos"] if x.get("path")]
         caminho_abs_estoque = [estado["estoque"]["path"]] if estado.get("estoque") and estado["estoque"].get("path") else []
         _persistir_estado_uploads(estado)
+        process_token = (request.form.get("process_token") or "").strip() or uuid.uuid4().hex
+        session["last_process_token"] = process_token
+        total_estimado = max(len(caminho_abs_receber), len(caminho_abs_recebidos), 1)
+        _set_progresso(
+            process_token,
+            status="iniciado",
+            concluidos=0,
+            total_empreendimentos=total_estimado,
+            empreendimento_atual=None,
+            mensagem="Preparando execução do lote...",
+            erro=None,
+            iniciado_em=time.time(),
+        )
+
+        def _callback_progresso(payload: dict):
+            if not isinstance(payload, dict):
+                return
+            status = str(payload.get("status") or "processando")
+            total_cb = int(payload.get("total_empreendimentos") or total_estimado)
+            concl_cb = int(payload.get("concluidos") or 0)
+            emp_atual = payload.get("empreendimento_atual")
+            msg = "Processando lote..."
+            if status == "iniciado":
+                msg = "Lote iniciado."
+            elif status == "concluido":
+                msg = "Lote concluído."
+            elif emp_atual:
+                msg = f"Processando empreendimento: {emp_atual}"
+            extras = {}
+            for k in (
+                "itens_tempo",
+                "item_atual_abas",
+                "abas_item",
+                "estimativa_total_segundos",
+                "tempo_decorrido_segundos",
+                "percentual_tempo",
+            ):
+                if k in payload:
+                    extras[k] = payload.get(k)
+            _set_progresso(
+                process_token,
+                status=status,
+                concluidos=max(0, concl_cb),
+                total_empreendimentos=max(1, total_cb),
+                empreendimento_atual=emp_atual,
+                mensagem=msg,
+                **extras,
+            )
 
         caminho_saida_base = os.path.join(
             app.config["OUTPUT_FOLDER"],
@@ -290,8 +525,15 @@ def index():
                 caminho_saida_base,
                 modo_param,
                 caminhos_estoque=caminho_abs_estoque or None,
+                progresso_cb=_callback_progresso,
             )
         except ProcessamentoUAUErro as e:
+            _set_progresso(
+                process_token,
+                status="erro",
+                erro=f"Erro na etapa de {e.etapa}.",
+                mensagem=e.mensagem,
+            )
             relatorio_txt = None
             try:
                 relatorio_txt = e.formatar_relatorio_completo()
@@ -327,6 +569,12 @@ def index():
                 uploads_estado=estado,
             )
         except ValueError as e:
+            _set_progresso(
+                process_token,
+                status="erro",
+                erro="Erro na etapa de validacao dos dados.",
+                mensagem=str(e),
+            )
             app.logger.exception("Erro de validação durante processamento")
             return render_template(
                 "index.html",
@@ -335,6 +583,12 @@ def index():
                 uploads_estado=estado,
             )
         except Exception as e:
+            _set_progresso(
+                process_token,
+                status="erro",
+                erro="Erro na etapa de processamento.",
+                mensagem=str(e),
+            )
             app.logger.exception("Erro inesperado durante processamento")
             return render_template(
                 "index.html",
@@ -353,6 +607,12 @@ def index():
             caminho_saida_final = saida_processamento
 
         if not os.path.exists(caminho_saida_final):
+            _set_progresso(
+                process_token,
+                status="erro",
+                erro="O arquivo final não foi gerado.",
+                mensagem="O processamento foi concluído sem gerar o arquivo de saída.",
+            )
             return render_template(
                 "index.html",
                 erro="O arquivo final não foi gerado.",
@@ -374,6 +634,27 @@ def index():
         session["download_consolidado_basename"] = basename_principal
         session["download_base_ok"] = os.path.isfile(caminho_base)
         session["download_base_basename"] = basename_base if os.path.isfile(caminho_base) else None
+        _set_progresso(
+            process_token,
+            status="concluido",
+            concluidos=total_estimado,
+            total_empreendimentos=total_estimado,
+            empreendimento_atual=None,
+            mensagem="Processamento concluído com sucesso.",
+            erro=None,
+            finalizado_em=time.time(),
+        )
+        resumo_item_tempo = []
+        try:
+            progresso_final = _get_progresso(process_token) or {}
+            if isinstance(progresso_final.get("itens_tempo"), list):
+                resumo_item_tempo = progresso_final.get("itens_tempo") or []
+            resumo_item_tempo = sorted(
+                resumo_item_tempo,
+                key=lambda x: float((x or {}).get("segundos") or 0.0),
+            )
+        except Exception:
+            resumo_item_tempo = []
         return render_template(
             "index.html",
             sucesso=True,
@@ -383,18 +664,119 @@ def index():
             qtd_receber=len(caminho_abs_receber),
             qtd_recebidos=len(caminho_abs_recebidos),
             download_base_disponivel=os.path.isfile(caminho_base),
+            process_token=process_token,
+            resumo_itens_tempo=resumo_item_tempo,
             uploads_estado=estado,
         )
 
-    return render_template("index.html", uploads_estado=estado)
+    return render_template(
+        "index.html",
+        uploads_estado=estado,
+        process_token=session.get("last_process_token") or "",
+        cache_notice=cache_notice,
+        cache_notice_type=cache_notice_type,
+    )
+
+
+@app.route("/limpar-lote", methods=["GET"])
+def limpar_lote():
+    estado = _estado_uploads()
+    _limpar_lote_uploads(estado)
+    return redirect(url_for("index"))
+
+
+@app.route("/limpar-cache", methods=["POST"])
+def limpar_cache():
+    if _ha_processamento_ativo():
+        session["cache_notice"] = "Não foi possível limpar o cache: existe processamento ativo em andamento."
+        session["cache_notice_type"] = "erro"
+        return redirect(url_for("index"))
+
+    estado = _estado_uploads()
+    _limpar_lote_uploads(estado)
+
+    rem_uploads, err_uploads = _limpar_conteudo_diretorio(UPLOAD_FOLDER)
+    rem_outputs, err_outputs = _limpar_conteudo_diretorio(OUTPUT_FOLDER)
+
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    os.makedirs(PROGRESS_FOLDER, exist_ok=True)
+
+    with _LOTE_PROGRESS_LOCK:
+        _LOTE_PROGRESS.clear()
+
+    for key in (
+        "uploads_receber",
+        "uploads_recebidos",
+        "upload_estoque",
+        "download_consolidado_ok",
+        "download_consolidado_basename",
+        "download_base_ok",
+        "download_base_basename",
+        "last_process_token",
+    ):
+        session.pop(key, None)
+
+    if err_uploads or err_outputs:
+        session["cache_notice"] = (
+            f"Cache limpo parcialmente. Removidos: uploads={rem_uploads}, outputs={rem_outputs}. "
+            f"Não removidos: uploads={err_uploads}, outputs={err_outputs}."
+        )
+        session["cache_notice_type"] = "erro"
+    else:
+        session["cache_notice"] = (
+            f"Cache limpo com sucesso. Removidos: uploads={rem_uploads}, outputs={rem_outputs}."
+        )
+        session["cache_notice_type"] = "ok"
+    return redirect(url_for("index"))
+
+
+def _reset_ambiente_habilitado() -> bool:
+    """Rota utilitária só em desenvolvimento/local (evita uso acidental em produção)."""
+    if (os.environ.get("FLASK_ENV") or "").strip().lower() == "development":
+        return True
+    if os.environ.get("UAU_RESET_AMBIENTE", "").strip() == "1":
+        return True
+    if os.environ.get("FLASK_DEBUG", "0").strip() == "1":
+        return True
+    return False
+
+
+@app.route("/reset-ambiente", methods=["GET", "POST"])
+def reset_ambiente():
+    if not _reset_ambiente_habilitado():
+        abort(404)
+    estado = _estado_uploads()
+    _limpar_lote_uploads(estado)
+    upload_dir = os.path.abspath(app.config["UPLOAD_FOLDER"])
+    try:
+        for nome in os.listdir(upload_dir):
+            caminho = os.path.join(upload_dir, nome)
+            if os.path.isfile(caminho):
+                try:
+                    os.remove(caminho)
+                except OSError:
+                    app.logger.warning("reset-ambiente: não foi possível remover %s", caminho)
+    except OSError:
+        app.logger.warning("reset-ambiente: não foi possível listar %s", upload_dir)
+    for key in (
+        "uploads_receber",
+        "uploads_recebidos",
+        "upload_estoque",
+        "download_consolidado_ok",
+        "download_consolidado_basename",
+        "download_base_ok",
+        "download_base_basename",
+    ):
+        session.pop(key, None)
+    return redirect(url_for("index"))
 
 
 @app.route("/baixar-planilha", methods=["GET"])
 def baixar_planilha():
-    if not session.get("download_consolidado_ok"):
-        return redirect(url_for("index"))
-
-    basename = os.path.basename(session.get("download_consolidado_basename") or "")
+    basename = os.path.basename(
+        session.get("download_consolidado_basename") or "CARTEIRAS GERAL.xlsx"
+    )
     if not basename.lower().endswith(".xlsx"):
         session.pop("download_consolidado_ok", None)
         session.pop("download_consolidado_basename", None)
@@ -408,8 +790,6 @@ def baixar_planilha():
         return redirect(url_for("index"))
 
     if not os.path.isfile(caminho):
-        session.pop("download_consolidado_ok", None)
-        session.pop("download_consolidado_basename", None)
         return render_template(
             "index.html",
             erro="O arquivo consolidado não está mais disponível.",
@@ -417,17 +797,14 @@ def baixar_planilha():
             uploads_estado=_estado_uploads(),
         )
 
-    session.pop("download_consolidado_ok", None)
-    session.pop("download_consolidado_basename", None)
     return send_file(caminho, as_attachment=True, download_name=basename)
 
 
 @app.route("/baixar-base", methods=["GET"])
 def baixar_base():
-    if not session.get("download_base_ok"):
-        return redirect(url_for("index"))
-
-    basename = os.path.basename(session.get("download_base_basename") or "")
+    basename = os.path.basename(
+        session.get("download_base_basename") or "CARTEIRAS BANCO DE DADOS.xlsx"
+    )
     if not basename.lower().endswith(".xlsx"):
         session.pop("download_base_ok", None)
         session.pop("download_base_basename", None)
@@ -441,8 +818,6 @@ def baixar_base():
         return redirect(url_for("index"))
 
     if not os.path.isfile(caminho):
-        session.pop("download_base_ok", None)
-        session.pop("download_base_basename", None)
         return render_template(
             "index.html",
             erro="O arquivo base não está mais disponível.",
@@ -450,10 +825,31 @@ def baixar_base():
             uploads_estado=_estado_uploads(),
         )
 
-    session.pop("download_base_ok", None)
-    session.pop("download_base_basename", None)
     return send_file(caminho, as_attachment=True, download_name=basename)
 
+
+@app.route("/progresso-lote/<token>", methods=["GET"])
+def progresso_lote(token: str):
+    item = _get_progresso((token or "").strip())
+    if not item:
+        return jsonify({"ok": False, "status": "desconhecido"}), 404
+    payload = {
+        "ok": True,
+        "token": item.get("token") or token,
+        "status": item.get("status") or "iniciado",
+        "concluidos": int(item.get("concluidos") or 0),
+        "total_empreendimentos": int(item.get("total_empreendimentos") or 0),
+        "empreendimento_atual": item.get("empreendimento_atual"),
+        "mensagem": item.get("mensagem"),
+        "erro": item.get("erro"),
+        "itens_tempo": item.get("itens_tempo") or [],
+        "item_atual_abas": item.get("item_atual_abas"),
+        "abas_item": item.get("abas_item") or [],
+        "estimativa_total_segundos": item.get("estimativa_total_segundos"),
+        "tempo_decorrido_segundos": item.get("tempo_decorrido_segundos"),
+        "percentual_tempo": item.get("percentual_tempo"),
+    }
+    return jsonify(payload)
 
 @app.errorhandler(RequestEntityTooLarge)
 def tratar_arquivo_muito_grande(_erro):
@@ -470,3 +866,5 @@ def tratar_arquivo_muito_grande(_erro):
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(debug=debug_mode)
+
+

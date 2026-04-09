@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Meu Financeiro UAU</title>
+    <title>Central UAU — Gestão Financeira e Imobiliária</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -41,11 +41,20 @@
             --font: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
         }
 
-        * { box-sizing: border-box; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            overflow-x: hidden;
+        }
 
         body {
             margin: 0;
             min-height: 100vh;
+            overflow-x: hidden;
             font-family: var(--font);
             background: var(--bg-deep);
             background-image:
@@ -58,106 +67,42 @@
         }
 
         .shell {
+            width: 100%;
             max-width: 1240px;
             margin: 0 auto;
-            padding: 36px 22px 52px;
+            padding: clamp(20px, 4vw, 36px) clamp(14px, 3vw, 22px) 52px;
+            min-width: 0;
         }
 
-        /* —— Cabeçalho —— */
+        /* Cabeçalho */
         header.hero {
             text-align: center;
             margin-bottom: 44px;
-            position: relative;
+            padding-top: 12px;
         }
 
-        header.hero::after {
-            content: "";
-            display: block;
-            width: 72px;
-            height: 3px;
-            margin: 28px auto 0;
-            border-radius: 999px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.65;
-        }
-
-        .hero-mark {
-            display: inline-flex;
-            align-items: center;
+        .hero-art-wrap {
+            width: 100%;
+            display: flex;
             justify-content: center;
-            width: 52px;
-            height: 52px;
-            margin-bottom: 20px;
-            border-radius: 14px;
-            background: linear-gradient(145deg, var(--accent-soft), rgba(255, 255, 255, 0.03));
-            border: 1px solid var(--border-strong);
-            box-shadow: var(--shadow-sm), 0 0 0 1px rgba(212, 36, 62, 0.15) inset;
         }
 
-        .hero-mark svg {
-            width: 26px;
-            height: 26px;
-            color: var(--accent);
+        .hero-art {
+            width: min(720px, 70vw);
+            height: auto;
+            display: block;
+            border-radius: 18px;
+            border: none;
+            box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
         }
 
-        header.hero .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-            background: var(--bg-card);
-            padding: 8px 16px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            margin-bottom: 18px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        header.hero .badge-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--success);
-            box-shadow: 0 0 10px var(--success);
-        }
-
-        header.hero h1 {
-            margin: 0 0 14px;
-            font-size: clamp(1.75rem, 4.5vw, 2.35rem);
-            font-weight: 700;
-            letter-spacing: -0.035em;
-            line-height: 1.15;
-            color: var(--text);
-        }
-
-        @supports (-webkit-background-clip: text) or (background-clip: text) {
-            header.hero h1 {
-                background: linear-gradient(180deg, #fff 0%, #c5cad6 100%);
-                -webkit-background-clip: text;
-                background-clip: text;
-                -webkit-text-fill-color: transparent;
-                color: transparent;
+        @media (max-width: 860px) {
+            .hero-art {
+                border-radius: 14px;
             }
         }
 
-        header.hero p.lead {
-            margin: 0 auto;
-            max-width: 540px;
-            color: var(--text-secondary);
-            font-size: 1.0625rem;
-            font-weight: 450;
-        }
-
-        header.hero p.lead strong {
-            color: var(--text);
-            font-weight: 600;
-        }
-
-        /* —— Painéis / cards —— */
+        /* Painéis / cards */
         .panel {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -181,7 +126,7 @@
         }
 
         .panel-header {
-            padding: 22px 26px 18px;
+            padding: 22px clamp(16px, 3vw, 26px) 18px;
             border-bottom: 1px solid var(--border);
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
         }
@@ -223,7 +168,14 @@
         }
 
         .panel-body {
-            padding: 22px 26px 28px;
+            padding: 22px clamp(16px, 3vw, 26px) 28px;
+            min-width: 0;
+        }
+
+        #form-processamento.panel {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
         }
 
         .panel-body > h2 {
@@ -256,20 +208,32 @@
         .grid-2 {
             display: grid;
             gap: 18px;
+            min-width: 0;
+        }
+
+        .grid-2 > * {
+            min-width: 0;
         }
 
         @media (min-width: 860px) {
             .grid-2 { grid-template-columns: 1fr 1fr; }
         }
 
-        /* —— Upload —— */
+        /* Upload */
         .upload-zone {
             position: relative;
             border: 1px dashed rgba(255, 255, 255, 0.14);
             border-radius: var(--radius-sm);
             padding: 20px 18px 18px;
-            background: var(--bg-card-inner);
+            background:
+                linear-gradient(160deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+                var(--bg-card-inner);
             transition: border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+            min-width: 0;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         .upload-zone:hover {
@@ -279,6 +243,7 @@
         }
         .upload-zone.receber {
             border-color: rgba(212, 36, 62, 0.35);
+            box-shadow: inset 0 0 0 1px rgba(212, 36, 62, 0.12), 0 0 22px rgba(212, 36, 62, 0.09);
         }
         .upload-zone.receber .upload-ico {
             color: #ff6f7f;
@@ -287,6 +252,7 @@
         }
         .upload-zone.recebidos {
             border-color: rgba(46, 184, 114, 0.35);
+            box-shadow: inset 0 0 0 1px rgba(46, 184, 114, 0.11), 0 0 22px rgba(46, 184, 114, 0.08);
         }
         .upload-zone.recebidos .upload-ico {
             color: var(--success);
@@ -295,6 +261,7 @@
         }
         .upload-zone.estoque {
             border-color: rgba(232, 185, 49, 0.4);
+            box-shadow: inset 0 0 0 1px rgba(232, 185, 49, 0.11), 0 0 22px rgba(232, 185, 49, 0.08);
         }
         .upload-zone.estoque .upload-ico {
             color: var(--warning);
@@ -307,6 +274,11 @@
             align-items: flex-start;
             gap: 12px;
             margin-bottom: 12px;
+            min-width: 0;
+        }
+
+        .upload-zone-head > div:last-child {
+            min-width: 0;
         }
 
         .upload-zone .upload-ico {
@@ -351,13 +323,15 @@
             align-items: center;
             gap: 10px;
             margin-top: 12px;
+            min-width: 0;
+            max-width: 100%;
         }
 
         input[type="file"] {
             flex: 1;
             min-width: 0;
-            font-size: 0.8125rem;
-            color: var(--text-muted);
+            font-size: 0;
+            color: transparent;
         }
 
         input[type="file"]::file-selector-button {
@@ -386,20 +360,23 @@
         .btn-file-secondary {
             padding: 8px 14px;
             font-family: inherit;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            background: transparent;
-            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #d8deea;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.18);
             border-radius: var(--radius-xs);
             cursor: pointer;
-            transition: color 0.18s, border-color 0.18s, background 0.18s;
+            transition: color 0.18s, border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
         }
 
         .btn-file-secondary:hover {
-            color: var(--text);
-            border-color: var(--border-strong);
-            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            border-color: rgba(77, 142, 255, 0.5);
+            background: linear-gradient(180deg, rgba(77, 142, 255, 0.22), rgba(77, 142, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(77, 142, 255, 0.18);
         }
 
         .file-count {
@@ -414,6 +391,7 @@
             background: var(--info-bg);
             border: 1px solid rgba(77, 142, 255, 0.22);
             border-radius: var(--radius-xs);
+            cursor: help;
         }
 
         .file-count:empty {
@@ -431,6 +409,8 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-xs);
             background: rgba(255, 255, 255, 0.02);
+            min-width: 0;
+            max-width: 100%;
         }
         .persist-title {
             margin: 0 0 8px;
@@ -440,23 +420,67 @@
             color: var(--text-muted);
             font-weight: 700;
         }
+        /* Lote anexado: coluna única em todos os breakpoints — nome legível, ações abaixo */
         .persist-item {
             display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 10px;
-            align-items: center;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
             padding: 9px 0;
             border-top: 1px solid var(--border);
+            min-width: 0;
         }
         .persist-item:first-of-type { border-top: none; padding-top: 0; }
-        .persist-name { font-size: 0.84rem; color: var(--text); font-weight: 600; }
-        .persist-meta { font-size: 0.76rem; color: var(--text-muted); }
-        .persist-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-        .btn-mini {
-            padding: 7px 10px; font-size: 0.72rem; border-radius: 8px; border: 1px solid var(--border);
-            background: var(--bg-card-inner); color: var(--text-secondary); cursor: pointer;
+        .persist-item > div:first-child {
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
         }
-        .btn-mini:hover { color: var(--text); border-color: var(--border-strong); }
+        .persist-name {
+            font-size: 0.84rem;
+            color: var(--text);
+            font-weight: 600;
+            line-height: 1.45;
+            overflow-wrap: break-word;
+            word-break: normal;
+            hyphens: auto;
+        }
+        .persist-meta {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            overflow-wrap: break-word;
+            word-break: normal;
+        }
+        .persist-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            align-self: stretch;
+            gap: 8px;
+            max-width: 100%;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .persist-actions .btn-mini {
+            align-self: flex-start;
+            flex-shrink: 0;
+        }
+        .persist-actions input[type="file"] {
+            flex: 0 1 auto;
+            min-width: 0;
+            width: auto;
+            max-width: min(240px, 100%);
+            box-sizing: border-box;
+        }
+        .btn-mini {
+            padding: 7px 10px; font-size: 0.74rem; border-radius: 9px; border: 1px solid rgba(255,255,255,0.16);
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+            color: #dbe1ed;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-mini:hover { color: #fff; border-color: rgba(77, 142, 255, 0.5); background: linear-gradient(180deg, rgba(77, 142, 255, 0.18), rgba(77, 142, 255, 0.08)); }
         .status-badge {
             display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 0.68rem;
             border: 1px solid rgba(46, 184, 114, 0.4); color: #aef0cb; background: rgba(46, 184, 114, 0.12);
@@ -464,7 +488,7 @@
         .substitute-inline { display: none; margin-top: 6px; }
         .substitute-inline.active { display: block; }
 
-        /* —— Modo de geração —— */
+        /* Modo de geração */
         .modo-grid {
             display: grid;
             gap: 14px;
@@ -546,21 +570,21 @@
             line-height: 1.45;
         }
 
-        /* —— Botão principal —— */
+        /* Botão principal */
         .btn-primary {
             width: 100%;
             margin-top: 22px;
-            padding: 17px 24px;
+            padding: 18px 24px;
             font-family: inherit;
-            font-size: 1.02rem;
-            font-weight: 700;
+            font-size: 1.04rem;
+            font-weight: 800;
             letter-spacing: -0.02em;
             color: #fff;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+            background: linear-gradient(135deg, #ff3358 0%, #bf1e37 45%, #7f1628 100%);
             border: none;
             border-radius: var(--radius-sm);
             cursor: pointer;
-            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2), 0 12px 32px var(--accent-glow);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.22), 0 14px 34px rgba(255, 51, 88, 0.3);
             transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
         }
 
@@ -586,7 +610,16 @@
             border: 1px solid var(--border);
         }
 
-        /* —— Alertas —— */
+        @media (max-width: 519px) {
+            #form-processamento .panel-body > .btn-file-secondary {
+                display: block;
+                width: 100%;
+                max-width: 100%;
+                text-align: center;
+            }
+        }
+
+        /* Alertas */
         .alert {
             border-radius: var(--radius-sm);
             padding: 20px 22px;
@@ -594,6 +627,10 @@
             font-size: 0.9rem;
             border: 1px solid;
             box-shadow: var(--shadow-sm);
+            max-width: 100%;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .alert-erro {
@@ -617,7 +654,7 @@
             padding-left: 1.2rem;
         }
 
-        /* —— Download —— */
+        /* Download */
         .download-block {
             margin-top: 22px;
             padding: 24px 22px;
@@ -674,6 +711,10 @@
             border-radius: var(--radius-sm);
             box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15), 0 12px 28px rgba(46, 184, 114, 0.25);
             transition: transform 0.18s, filter 0.18s, box-shadow 0.18s;
+            max-width: 100%;
+            flex-wrap: wrap;
+            text-align: center;
+            box-sizing: border-box;
         }
 
         .download-block a svg {
@@ -692,15 +733,18 @@
             font-size: 0.88em;
         }
 
-        /* —— Monitor —— */
+        /* Monitor */
         .monitor {
             display: none;
             margin-bottom: 28px;
             padding: 0;
             border-radius: var(--radius);
-            background: var(--bg-card);
-            border: 1px solid rgba(77, 142, 255, 0.22);
-            box-shadow: var(--shadow-md), 0 0 40px rgba(77, 142, 255, 0.06);
+            background:
+                radial-gradient(ellipse 140% 95% at 0% -40%, rgba(77, 142, 255, 0.12), transparent 58%),
+                radial-gradient(ellipse 120% 90% at 100% -40%, rgba(126, 182, 255, 0.09), transparent 60%),
+                var(--bg-card);
+            border: 1px solid rgba(77, 142, 255, 0.35);
+            box-shadow: var(--shadow-md), 0 0 54px rgba(77, 142, 255, 0.1);
             overflow: hidden;
         }
 
@@ -720,7 +764,9 @@
         }
 
         .monitor-inner {
-            padding: 22px 24px 24px;
+            padding: 22px clamp(16px, 3vw, 24px) 24px;
+            min-width: 0;
+            max-width: 100%;
         }
 
         .monitor-top {
@@ -735,8 +781,9 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            font-weight: 700;
-            font-size: 0.9375rem;
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.01em;
             color: var(--info);
         }
 
@@ -781,9 +828,22 @@
             border: 1px solid var(--border);
             font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
         }
+        #contador-estimado {
+            font-size: 2.1rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.06em;
+            line-height: 1;
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+            color: #76c9ff;
+        }
 
-        .tempo-otimo { color: #7eb6ff; }
-        .tempo-bom { color: #5fd99a; }
+        .tempo-otimo { color: #57d98d; }
+        .tempo-bom { color: #76c9ff; }
         .tempo-atencao { color: #f0d060; }
         .tempo-critico { color: #ff8a7a; }
 
@@ -796,6 +856,9 @@
             border-radius: var(--radius-xs);
             border-left: 3px solid var(--info);
             line-height: 1.5;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .monitor-legend {
@@ -826,7 +889,175 @@
             color: var(--text-secondary);
         }
 
-        /* —— Instruções / TXT / passos —— */
+        #monitor-estimativa {
+            display: none;
+        }
+
+        .monitor-progress-wrap {
+            margin-top: 14px;
+        }
+
+        .monitor-progress-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .monitor-progress-track {
+            width: 100%;
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .monitor-progress-bar {
+            width: 0%;
+            height: 100%;
+            border-radius: 999px;
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.02) 30%, transparent 65%),
+                linear-gradient(90deg, #54a3ff, #6bc3ff, #80e0cc);
+            box-shadow: 0 0 18px rgba(84, 163, 255, 0.35);
+            transition: width 0.55s ease;
+            position: relative;
+        }
+
+        .monitor-progress-bar::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 52px;
+            right: -24px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+            filter: blur(0.5px);
+            animation: bar-sheen 1.8s linear infinite;
+        }
+
+        @keyframes bar-sheen {
+            from { transform: translateX(-36px); opacity: 0.25; }
+            50% { opacity: 0.7; }
+            to { transform: translateX(36px); opacity: 0.2; }
+        }
+
+        .monitor-progress-meta {
+            margin-top: 10px;
+            display: grid;
+            gap: 10px;
+        }
+
+        @media (min-width: 760px) {
+            .monitor-progress-meta {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        .monitor-chip {
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            min-width: 0;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .monitor-chip-label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+        }
+
+        .monitor-chip-value {
+            font-size: 1rem;
+            color: var(--text);
+            font-weight: 800;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .monitor-chip-sub {
+            margin-top: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .monitor.concluido {
+            border-color: rgba(46, 184, 114, 0.45);
+            box-shadow: var(--shadow-md), 0 0 54px rgba(46, 184, 114, 0.15);
+        }
+        .monitor.concluido .monitor-accent {
+            background: linear-gradient(90deg, #41d78b, #79efba, #41d78b);
+        }
+
+        .post-tempo-box {
+            margin-top: 14px;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(8, 12, 20, 0.45);
+        }
+        .post-tempo-title {
+            margin: 0 0 10px;
+            font-size: 0.84rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #dce3f2;
+            font-weight: 700;
+        }
+        .post-tempo-grid {
+            display: grid;
+            gap: 8px;
+        }
+        .post-tempo-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .post-tempo-emp {
+            font-weight: 700;
+            color: #f0f2f7;
+            overflow-wrap: anywhere;
+        }
+        .post-tempo-val {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            color: #fff;
+        }
+        .post-badge {
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+        }
+        .post-verde { background: rgba(46, 184, 114, 0.14); border-color: rgba(46, 184, 114, 0.35); color: #b8f2d4; }
+        .post-azul { background: rgba(77, 142, 255, 0.14); border-color: rgba(77, 142, 255, 0.35); color: #c7deff; }
+        .post-amarelo { background: rgba(232, 185, 49, 0.14); border-color: rgba(232, 185, 49, 0.35); color: #f5dea3; }
+        .post-vermelho { background: rgba(240, 91, 77, 0.16); border-color: rgba(240, 91, 77, 0.38); color: #ffc9c2; }
+
+        /* Instruções / TXT / passos */
         .txt-spec {
             display: grid;
             gap: 12px;
@@ -873,6 +1104,12 @@
         .duas-colunas-util {
             display: grid;
             gap: 22px;
+            min-width: 0;
+        }
+
+        .duas-colunas-util > * {
+            min-width: 0;
+            max-width: 100%;
         }
 
         @media (min-width: 720px) {
@@ -962,7 +1199,7 @@
             line-height: 1.5;
         }
 
-        /* Passos — timeline */
+        /* Passos / timeline */
         .steps {
             position: relative;
             padding-left: 8px;
@@ -1036,23 +1273,23 @@
             font-size: 0.78rem;
             color: var(--text-muted);
             letter-spacing: 0.02em;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            padding-left: 8px;
+            padding-right: 8px;
         }
     </style>
 </head>
 <body>
     <div class="shell">
         <header class="hero">
-            <div class="hero-mark" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            <div class="hero-art-wrap">
+                <img
+                    class="hero-art"
+                    src="{{ url_for('static', filename='img/hero-central-uau.png') }}"
+                    alt="Central UAU - Gestão Financeira e Imobiliária"
+                />
             </div>
-            <span class="badge"><span class="badge-dot" aria-hidden="true"></span> Motor homologado · Lote</span>
-            <h1>Meu Financeiro UAU</h1>
-            <p class="lead">
-                Envie os relatórios TXT exportados do UAU para gerar o Excel consolidado,
-                com suporte a <strong>múltiplos arquivos</strong> por tipo.
-            </p>
         </header>
 
         {% if erro %}
@@ -1068,10 +1305,16 @@
         </div>
         {% endif %}
 
+        {% if cache_notice %}
+        <div class="alert {{ 'alert-erro' if cache_notice_type == 'erro' else 'alert-ok' }}" role="status">
+            <strong>{{ cache_notice }}</strong>
+        </div>
+        {% endif %}
+
         {% if sucesso %}
         <div class="alert alert-ok" role="status">
             <strong>Processamento concluído com sucesso.</strong><br />
-            Tempo total (mm:ss): <strong>{{ tempo_execucao_mmss|default('—') }}</strong>
+            Tempo total (mm:ss): <strong>{{ tempo_execucao_mmss|default('') }}</strong>
             <span class="tempo-inline">({{ tempo_execucao|round(2) }} s)</span><br />
             {% if modo_geracao_exibicao %}
             <span style="font-size:0.9em;opacity:0.95">Processamento: <strong>Lote por empreendimento</strong>
@@ -1080,7 +1323,7 @@
             <div class="download-block">
                 <div class="download-block-inner">
                     <div class="download-title">Arquivos prontos para download</div>
-                    <div class="download-sub">Saída principal executiva por empreendimento e base de dados separada para BI/download opcional.</div>
+                    <div class="download-sub">Saída principal executiva por empreendimento e base opcional em formato SQL-like (somente dados, sem painéis).</div>
                     <a href="{{ url_for('baixar_planilha') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                         Baixar CARTEIRAS GERAL
@@ -1090,6 +1333,21 @@
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                         Baixar CARTEIRAS BANCO DE DADOS (opcional)
                     </a>
+                    {% endif %}
+                    {% if resumo_itens_tempo %}
+                    <div class="post-tempo-box">
+                        <div class="post-tempo-title">Confira o tempo de processamento de cada arquivo</div>
+                        <div class="post-tempo-grid">
+                            {% for item in resumo_itens_tempo %}
+                            {% set cor = (item.cor|default('azul')) %}
+                            <div class="post-tempo-item">
+                                <span class="post-tempo-emp">{{ item.empreendimento|default('ITEM') }}</span>
+                                <span class="post-tempo-val">{{ "%.2f"|format(item.segundos|default(0)|float) }} s</span>
+                                <span class="post-badge post-{{ cor }}">{{ cor }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -1105,6 +1363,20 @@
                     Entrada de arquivos
                 </h2>
                 <p class="hint">Selecione um ou mais arquivos <strong>.txt</strong> em cada grupo. Não misture Receber com Recebidos.</p>
+                <p class="hint" style="margin-top:10px;">
+                    <a href="{{ url_for('limpar_lote') }}" style="color:#ff9ca8;text-decoration:underline;">Limpar todo o lote anexado agora</a>
+                </p>
+                <button
+                    type="submit"
+                    formnovalidate
+                    formaction="{{ url_for('limpar_cache') }}"
+                    formmethod="post"
+                    class="btn-file-secondary"
+                    style="margin-top:8px;border-color: rgba(240, 91, 77, 0.45); color:#ffd2ce;"
+                    onclick="return confirm('Isso vai limpar uploads, outputs e progresso. Deseja continuar?');"
+                >
+                    Limpar cache do sistema
+                </button>
             </div>
             <div class="panel-body">
                 <div class="grid-2">
@@ -1134,14 +1406,14 @@
                                         <div class="persist-meta">Anexado em {{ item.anexado_em }}</div>
                                     </div>
                                     <div class="persist-actions">
-                                        <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="remover_receber:{{ loop.index0 }}">Remover</button>
+                                        <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="remover_receber:{{ loop.index0 }}">Remover</button>
                                         <input type="file" form="form-processamento" name="arquivo_substituto" accept=".txt" />
-                                        <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="substituir_receber:{{ loop.index0 }}">Substituir</button>
+                                        <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="substituir_receber:{{ loop.index0 }}">Substituir</button>
                                     </div>
                                 </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="persist-meta">Nenhum arquivo anexado no lote.</div>
+                                <div id="empty-receber" class="persist-meta" data-default-msg="" data-selected-msg="Arquivos selecionados para envio. Passe o mouse no contador azul para ver a listagem completa."></div>
                             {% endif %}
                         </div>
                     </div>
@@ -1171,14 +1443,14 @@
                                         <div class="persist-meta">Anexado em {{ item.anexado_em }}</div>
                                     </div>
                                     <div class="persist-actions">
-                                        <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="remover_recebidos:{{ loop.index0 }}">Remover</button>
+                                        <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="remover_recebidos:{{ loop.index0 }}">Remover</button>
                                         <input type="file" form="form-processamento" name="arquivo_substituto" accept=".txt" />
-                                        <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="substituir_recebidos:{{ loop.index0 }}">Substituir</button>
+                                        <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="substituir_recebidos:{{ loop.index0 }}">Substituir</button>
                                     </div>
                                 </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="persist-meta">Nenhum arquivo anexado no lote.</div>
+                                <div id="empty-recebidos" class="persist-meta" data-default-msg="" data-selected-msg="Arquivos selecionados para envio. Passe o mouse no contador azul para ver a listagem completa."></div>
                             {% endif %}
                         </div>
                     </div>
@@ -1191,7 +1463,7 @@
                         </div>
                         <div>
                             <label class="main-label" for="arquivo_estoque">Relatório de Estoque <span style="font-weight:500;color:var(--text-muted)">(opcional)</span></label>
-                            <div class="sub">TXT UAU · gera a aba <strong>CONSOLIDADO ESTOQUE</strong> cruzada com o financeiro. Campos <em>Venda</em> e <em>Status da construção</em> são aceitos se existirem no arquivo. Em lote, pode enviar <strong>vários TXT</strong> (mesma lógica de prefixo do nome que Receber/Recebidos no modo por empreendimento).</div>
+                            <div class="sub">TXT UAU → gera a aba <strong>CONSOLIDADO ESTOQUE</strong> cruzada com o financeiro. Campos <em>Venda</em> e <em>Status da construção</em> são aceitos se existirem no arquivo. Em lote, pode enviar <strong>vários TXT</strong> (mesma lógica de prefixo do nome que Receber/Recebidos no modo por empreendimento).</div>
                         </div>
                     </div>
                     <div class="upload-actions">
@@ -1209,20 +1481,24 @@
                                 <div class="persist-meta">Anexado em {{ estoque_ativo.anexado_em }}</div>
                             </div>
                             <div class="persist-actions">
-                                <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="remover_estoque">Remover</button>
+                                <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="remover_estoque">Remover</button>
                                 <input type="file" form="form-processamento" name="arquivo_substituto" accept=".txt" />
-                                <button class="btn-mini" type="submit" form="form-processamento" name="acao" value="substituir_estoque">Substituir</button>
+                                <button class="btn-mini" type="submit" form="form-processamento" formnovalidate name="acao" value="substituir_estoque">Substituir</button>
                             </div>
                         </div>
                         {% else %}
-                        <div class="persist-meta">Nenhum estoque ativo. Ao anexar, ele permanece ativo até remoção manual.</div>
+                        <div id="empty-estoque" class="persist-meta" data-default-msg="Nenhum estoque ativo. Ao anexar, ele permanece ativo até remoção manual." data-selected-msg="Arquivo de estoque selecionado para envio. Passe o mouse no contador azul para ver o nome.">Nenhum estoque ativo. Ao anexar, ele permanece ativo até remoção manual.</div>
                         {% endif %}
                     </div>
                 </div>
 
                 <input type="hidden" name="modo_geracao" value="POR_EMPREENDIMENTO" />
+                <input type="hidden" name="process_token" id="process-token" value="{{ process_token|default('') }}" />
 
                 <button id="botao-gerar" type="submit" class="btn-primary" name="acao" value="processar">Gerar planilha</button>
+                <button type="submit" class="btn-file-secondary" formnovalidate name="acao" value="limpar_lote" style="margin-top:10px;">
+                    Limpar lote anexado
+                </button>
             </div>
         </form>
 
@@ -1234,16 +1510,42 @@
                     <div class="monitor-timer-wrap">
                         <span class="monitor-timer-label">Tempo decorrido</span>
                         <span id="contador-tempo" class="tempo-otimo">0:00</span>
+                        <span class="monitor-timer-label">Previsão</span>
+                        <span id="contador-estimado">0:00</span>
                     </div>
                 </div>
                 <div id="monitor-status">Inicializando validações e leitura dos arquivos…</div>
                 <div id="monitor-modo" class="monitor-meta"></div>
-                <div id="monitor-estimativa" class="monitor-meta">Estimativa de duração: calculada dinamicamente conforme volume de arquivos.</div>
+                <div id="monitor-estimativa" class="monitor-meta">Estimativa de duração: calculada com base no histórico real de execução.</div>
+                <div class="monitor-progress-wrap">
+                    <div class="monitor-progress-head">
+                        <span>Progresso do lote</span>
+                        <strong id="monitor-percentual">0%</strong>
+                    </div>
+                    <div class="monitor-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progresso do processamento">
+                        <div id="monitor-progress-bar" class="monitor-progress-bar"></div>
+                    </div>
+                    <div class="monitor-progress-meta">
+                        <div class="monitor-chip">
+                            <span class="monitor-chip-label">Andamento</span>
+                            <span id="monitor-empreendimento" class="monitor-chip-value">0 feito(s) / 0 total</span>
+                        </div>
+                        <div class="monitor-chip">
+                            <span class="monitor-chip-label">Item Atual</span>
+                            <span id="monitor-item-atual" class="monitor-chip-value">Preparando pareamento inicialâ€¦</span>
+                            <div id="monitor-item-abas" class="monitor-chip-sub">Aguardando leitura de abas</div>
+                        </div>
+                        <div class="monitor-chip">
+                            <span class="monitor-chip-label">Status</span>
+                            <span id="monitor-status-curto" class="monitor-chip-value">Em execução</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="monitor-legend" aria-hidden="true">
-                    <span><span class="dot dot-azul"></span> Início</span>
-                    <span><span class="dot dot-verde"></span> Curto</span>
-                    <span><span class="dot dot-amarelo"></span> Médio</span>
-                    <span><span class="dot dot-vermelho"></span> Longo</span>
+                    <span><span class="dot dot-verde"></span> Dentro do esperado</span>
+                    <span><span class="dot dot-azul"></span> No limite</span>
+                    <span><span class="dot dot-amarelo"></span> Atenção</span>
+                    <span><span class="dot dot-vermelho"></span> Acima do esperado</span>
                 </div>
             </div>
         </div>
@@ -1357,7 +1659,7 @@
                             <li><strong>Consolidado</strong> financeiro por venda/unidade, com carteira, parcelas e indicadores homologados.</li>
                             <li><strong>Pendências</strong> e <strong>relatório analítico</strong> para conferência de parcelas e fluxo.</li>
                             <li><strong>Dados Receber / Recebidos</strong> tratados (no lote por empreendimento, por obra).</li>
-                            <li><strong>CONSOLIDADO ESTOQUE</strong> — só aparece se houver arquivo de estoque: cruzamento com o financeiro, sem alterar o motor de valores.</li>
+                            <li><strong>CONSOLIDADO ESTOQUE</strong> só aparece se houver arquivo de estoque: cruzamento com o financeiro, sem alterar o motor de valores.</li>
                         </ul>
                     </div>
                     <div class="util-block">
@@ -1379,8 +1681,18 @@
             </div>
         </div>
 
-        <footer class="rodape">Sistema interno de consolidação financeira UAU</footer>
+        <footer class="rodape">Sistema interno — Central UAU — Gestão Financeira e Imobiliária</footer>
     </div>
+
+    <div id="runtime-meta"
+         data-last-exec-seconds="{{ (tempo_execucao if sucesso else 0)|default(0)|float }}"
+         data-last-exec-files="{{ ((qtd_receber|default(0)) + (qtd_recebidos|default(0)) + (1 if (uploads_estado and uploads_estado.estoque) else 0))|int }}"
+         data-last-exec-success="{{ 1 if sucesso else 0 }}"
+         data-process-token="{{ process_token|default('') }}"
+         data-upload-receber-count="{{ (uploads_estado.receber|length if uploads_estado and uploads_estado.receber else 0)|int }}"
+         data-upload-recebidos-count="{{ (uploads_estado.recebidos|length if uploads_estado and uploads_estado.recebidos else 0)|int }}"
+         data-upload-estoque-count="{{ 1 if (uploads_estado and uploads_estado.estoque) else 0 }}"
+         hidden></div>
 
     <script>
         (function () {
@@ -1403,6 +1715,9 @@
             var botao = document.getElementById("botao-gerar");
             var monitor = document.getElementById("monitor-processamento");
             var contador = document.getElementById("contador-tempo");
+            var contadorEstimado = document.getElementById("contador-estimado");
+            var monitorLabel = document.querySelector(".monitor-label");
+            var monitorPulse = document.querySelector(".monitor-pulse");
             var statusEl = document.getElementById("monitor-status");
             var monitorModo = document.getElementById("monitor-modo");
             var inpR = document.getElementById("arquivo_receber");
@@ -1411,10 +1726,190 @@
             var cR = document.getElementById("count-receber");
             var cP = document.getElementById("count-recebidos");
             var cE = document.getElementById("count-estoque");
+            var emptyR = document.getElementById("empty-receber");
+            var emptyP = document.getElementById("empty-recebidos");
+            var emptyE = document.getElementById("empty-estoque");
             var monitorEstimativa = document.getElementById("monitor-estimativa");
+            var monitorBarra = document.getElementById("monitor-progress-bar");
+            var monitorPercentual = document.getElementById("monitor-percentual");
+            var monitorEmpreendimento = document.getElementById("monitor-empreendimento");
+            var monitorItemAtual = document.getElementById("monitor-item-atual");
+            var monitorItemAbas = document.getElementById("monitor-item-abas");
+            var monitorStatusCurto = document.getElementById("monitor-status-curto");
+            var monitorProgressTrack = monitor ? monitor.querySelector(".monitor-progress-track") : null;
+            var runtimeMeta = document.getElementById("runtime-meta");
+            var processTokenInput = document.getElementById("process-token");
             var timerId = null;
+            var pollId = null;
             var inicioMs = 0;
-            var processamentoAtivo = false;
+            var progressoRealAtivo = false;
+            var estimativaAtualSegundos = 0;
+            var HIST_KEY = "uau_exec_history_v1";
+            var HIST_EMP_KEY = "uau_exec_history_emp_v1";
+            var ACTIVE_TOKEN_KEY = "uau_active_process_token_v1";
+            var NOTIF_TOKEN_PREFIX = "uau_notif_done_";
+            var titleOriginal = document.title;
+            var titleBlinkId = null;
+            var lastExecSeconds = runtimeMeta ? Number(runtimeMeta.dataset.lastExecSeconds || 0) : 0;
+            var lastExecFiles = runtimeMeta ? Number(runtimeMeta.dataset.lastExecFiles || 0) : 0;
+            var lastExecSuccess = runtimeMeta ? Number(runtimeMeta.dataset.lastExecSuccess || 0) : 0;
+            var lastProcessToken = runtimeMeta ? String(runtimeMeta.dataset.processToken || "") : "";
+            var persistedReceber = runtimeMeta ? Number(runtimeMeta.dataset.uploadReceberCount || 0) : 0;
+            var persistedRecebidos = runtimeMeta ? Number(runtimeMeta.dataset.uploadRecebidosCount || 0) : 0;
+            var persistedEstoque = runtimeMeta ? Number(runtimeMeta.dataset.uploadEstoqueCount || 0) : 0;
+
+            function lerHistoricoExecucao() {
+                try {
+                    var raw = localStorage.getItem(HIST_KEY);
+                    if (!raw) return [];
+                    var arr = JSON.parse(raw);
+                    if (!Array.isArray(arr)) return [];
+                    return arr.filter(function (x) {
+                        return x && Number(x.seconds) > 0 && Number(x.files) >= 0;
+                    });
+                } catch (_e) {
+                    return [];
+                }
+            }
+
+            function salvarExecucaoHistorico(seconds, files) {
+                if (!seconds || seconds <= 0) return;
+                var hist = lerHistoricoExecucao();
+                hist.push({
+                    seconds: Number(seconds),
+                    files: Math.max(1, Number(files || 0)),
+                    ts: Date.now()
+                });
+                if (hist.length > 8) {
+                    hist = hist.slice(hist.length - 8);
+                }
+                try {
+                    localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+                } catch (_e) {}
+            }
+
+            function lerHistoricoEmpreendimento() {
+                try {
+                    var raw = localStorage.getItem(HIST_EMP_KEY);
+                    if (!raw) return {};
+                    var obj = JSON.parse(raw);
+                    return obj && typeof obj === "object" ? obj : {};
+                } catch (_e) {
+                    return {};
+                }
+            }
+
+            function salvarHistoricoEmpreendimento(mapa) {
+                try {
+                    localStorage.setItem(HIST_EMP_KEY, JSON.stringify(mapa || {}));
+                } catch (_e) {}
+            }
+
+            function registrarTemposPorItem(itens) {
+                if (!Array.isArray(itens) || !itens.length) return;
+                var hist = lerHistoricoEmpreendimento();
+                itens.forEach(function (it) {
+                    var emp = String((it && it.empreendimento) || "").trim().toUpperCase();
+                    var seg = Number(it && it.segundos || 0);
+                    if (!emp || !seg || seg <= 0) return;
+                    var arr = Array.isArray(hist[emp]) ? hist[emp] : [];
+                    arr.push(seg);
+                    if (arr.length > 10) arr = arr.slice(arr.length - 10);
+                    hist[emp] = arr;
+                });
+                salvarHistoricoEmpreendimento(hist);
+            }
+
+            function extrairSiglaNomeArquivo(nome) {
+                var n = String(nome || "").toUpperCase();
+                n = n.replace(/^\d+_/, "");
+                n = n.replace(/^(REC|REB|EST|UPL)_\d+_/, "");
+                var m = n.match(/^([A-Z0-9]{2,})[_\-\s]/);
+                return m ? m[1] : "";
+            }
+
+            function estimativaPorEmpreendimentoSelecionado() {
+                var hist = lerHistoricoEmpreendimento();
+                var siglas = [];
+                if (inpR && inpR.files) {
+                    siglas = Array.from(inpR.files).map(function (f) { return extrairSiglaNomeArquivo(f.name); }).filter(Boolean);
+                }
+                if (!siglas.length) return 0;
+                var soma = 0;
+                var usados = 0;
+                siglas.forEach(function (s) {
+                    var arr = Array.isArray(hist[s]) ? hist[s] : [];
+                    if (!arr.length) return;
+                    var media = arr.reduce(function (a, b) { return a + Number(b || 0); }, 0) / arr.length;
+                    if (media > 0) {
+                        soma += media;
+                        usados += 1;
+                    }
+                });
+                return usados > 0 ? Math.round(soma) : 0;
+            }
+
+            function pararBlinkTitulo() {
+                if (titleBlinkId) {
+                    clearInterval(titleBlinkId);
+                    titleBlinkId = null;
+                }
+                document.title = titleOriginal;
+            }
+
+            function iniciarBlinkTituloConcluido() {
+                pararBlinkTitulo();
+                var mostrarBadge = true;
+                titleBlinkId = setInterval(function () {
+                    document.title = mostrarBadge ? "✅ Relatório pronto | Central UAU" : titleOriginal;
+                    mostrarBadge = !mostrarBadge;
+                }, 1200);
+            }
+
+            function notificarConclusao(texto) {
+                var msg = texto || "Seu relatório foi concluído e está pronto para download.";
+                if (document.hidden) {
+                    iniciarBlinkTituloConcluido();
+                } else {
+                    document.title = "✅ Relatório pronto | Central UAU";
+                    setTimeout(function () {
+                        if (!document.hidden) {
+                            document.title = titleOriginal;
+                        }
+                    }, 5000);
+                }
+                if ("Notification" in window && Notification.permission === "granted") {
+                    try {
+                        new Notification("Central UAU", { body: msg });
+                    } catch (_e) {}
+                }
+            }
+
+            function jaNotificadoToken(token) {
+                if (!token) return false;
+                try {
+                    return sessionStorage.getItem(NOTIF_TOKEN_PREFIX + token) === "1";
+                } catch (_e) {
+                    return false;
+                }
+            }
+
+            function marcarNotificadoToken(token) {
+                if (!token) return;
+                try {
+                    sessionStorage.setItem(NOTIF_TOKEN_PREFIX + token, "1");
+                } catch (_e) {}
+            }
+
+            document.addEventListener("visibilitychange", function () {
+                if (!document.hidden) {
+                    pararBlinkTitulo();
+                }
+            });
+
+            if (lastExecSuccess === 1 && lastExecSeconds > 0) {
+                salvarExecucaoHistorico(lastExecSeconds, lastExecFiles);
+            }
 
             document.querySelectorAll("[data-clear-input]").forEach(function (btn) {
                 btn.addEventListener("click", function () {
@@ -1431,9 +1926,21 @@
                 var nr = inpR && inpR.files ? inpR.files.length : 0;
                 var np = inpP && inpP.files ? inpP.files.length : 0;
                 var ne = inpE && inpE.files ? inpE.files.length : 0;
-                if (cR) cR.textContent = nr ? nr + " arquivo(s) em Contas a Receber" : "";
-                if (cP) cP.textContent = np ? np + " arquivo(s) em Contas Recebidas" : "";
-                if (cE) cE.textContent = ne ? ne + " arquivo(s) em Estoque" : "";
+                if (cR) {
+                    cR.textContent = nr ? nr + " arquivo(s) em Contas a Receber" : "";
+                    cR.title = nr ? Array.from(inpR.files).map(function (f) { return f.name; }).join("\n") : "";
+                }
+                if (cP) {
+                    cP.textContent = np ? np + " arquivo(s) em Contas Recebidas" : "";
+                    cP.title = np ? Array.from(inpP.files).map(function (f) { return f.name; }).join("\n") : "";
+                }
+                if (cE) {
+                    cE.textContent = ne ? ne + " arquivo(s) em Estoque" : "";
+                    cE.title = ne ? Array.from(inpE.files).map(function (f) { return f.name; }).join("\n") : "";
+                }
+                if (emptyR) emptyR.textContent = nr > 0 ? emptyR.dataset.selectedMsg : emptyR.dataset.defaultMsg;
+                if (emptyP) emptyP.textContent = np > 0 ? emptyP.dataset.selectedMsg : emptyP.dataset.defaultMsg;
+                if (emptyE) emptyE.textContent = ne > 0 ? emptyE.dataset.selectedMsg : emptyE.dataset.defaultMsg;
             }
 
             if (inpR) inpR.addEventListener("change", atualizarContagens);
@@ -1444,65 +1951,292 @@
             function atualizarFaixa(segundos) {
                 contador.classList.remove("tempo-otimo", "tempo-bom", "tempo-atencao", "tempo-critico");
                 statusEl.textContent = faseEstimada(segundos);
-                if (segundos <= 20) contador.classList.add("tempo-otimo");
-                else if (segundos <= 60) contador.classList.add("tempo-bom");
-                else if (segundos <= 120) contador.classList.add("tempo-atencao");
-                else contador.classList.add("tempo-critico");
+                var base = estimativaAtualSegundos > 0 ? estimativaAtualSegundos : 180;
+                if (segundos <= base * 0.55) {
+                    contador.classList.add("tempo-otimo");
+                    if (contadorEstimado) contadorEstimado.style.color = "#57d98d";
+                    if (monitorLabel) monitorLabel.style.color = "#57d98d";
+                    if (monitorPulse) monitorPulse.style.background = "#57d98d";
+                } else if (segundos <= base * 1.0) {
+                    contador.classList.add("tempo-bom");
+                    if (contadorEstimado) contadorEstimado.style.color = "#76c9ff";
+                    if (monitorLabel) monitorLabel.style.color = "#76c9ff";
+                    if (monitorPulse) monitorPulse.style.background = "#76c9ff";
+                } else if (segundos <= base * 1.35) {
+                    contador.classList.add("tempo-atencao");
+                    if (contadorEstimado) contadorEstimado.style.color = "#f0d060";
+                    if (monitorLabel) monitorLabel.style.color = "#f0d060";
+                    if (monitorPulse) monitorPulse.style.background = "#f0d060";
+                } else {
+                    contador.classList.add("tempo-critico");
+                    if (contadorEstimado) contadorEstimado.style.color = "#ff8a7a";
+                    if (monitorLabel) monitorLabel.style.color = "#ff8a7a";
+                    if (monitorPulse) monitorPulse.style.background = "#ff8a7a";
+                }
+            }
+
+            function clamp(num, min, max) {
+                return Math.min(Math.max(num, min), max);
+            }
+
+            function gerarTokenProcesso() {
+                var base = Date.now().toString(36);
+                var rand = Math.random().toString(36).slice(2, 10);
+                return "lote_" + base + "_" + rand;
+            }
+
+            function calcularTotaisMonitor() {
+                var nrSelecionado = inpR && inpR.files ? inpR.files.length : 0;
+                var npSelecionado = inpP && inpP.files ? inpP.files.length : 0;
+                var neSelecionado = inpE && inpE.files ? inpE.files.length : 0;
+
+                var totalReceber = persistedReceber + nrSelecionado;
+                var totalRecebidos = persistedRecebidos + npSelecionado;
+                var totalEstoque = persistedEstoque + (neSelecionado > 0 ? 1 : 0);
+                var totalEmpreendimentos = Math.max(totalReceber, totalRecebidos, 1);
+
+                return {
+                    receber: totalReceber,
+                    recebidos: totalRecebidos,
+                    estoque: totalEstoque,
+                    totalEmpreendimentos: totalEmpreendimentos
+                };
             }
 
             function textoModoMonitor() {
                 return "Modo: Por empreendimento (lote).";
             }
 
+            function estimativaBaseadaEmHistorico(totalArquivos) {
+                var hist = lerHistoricoExecucao();
+                if (!hist.length) return 0;
+                var secPorArquivo = hist.map(function (h) {
+                    return Number(h.seconds) / Math.max(1, Number(h.files));
+                });
+                var media = secPorArquivo.reduce(function (a, b) { return a + b; }, 0) / secPorArquivo.length;
+                var estimado = Math.round(media * Math.max(totalArquivos, 1));
+                return Math.max(45, Math.min(3600, estimado));
+            }
+
             function textoEstimativa(nr, np, ne) {
                 var total = nr + np + ne;
-                if (total <= 2) return "Estimativa: 1 a 3 minutos (base pequena).";
-                if (total <= 6) return "Estimativa: 3 a 8 minutos (base média).";
-                return "Estimativa: 8+ minutos (lote grande).";
+                var estimadoEmp = estimativaPorEmpreendimentoSelecionado();
+                if (estimadoEmp > 0) {
+                    return {
+                        texto: "",
+                        segundos: estimadoEmp
+                    };
+                }
+                var estimadoHist = estimativaBaseadaEmHistorico(total);
+                if (estimadoHist > 0) {
+                    return {
+                        texto: "",
+                        segundos: estimadoHist
+                    };
+                }
+                if (total <= 2) return { texto: "Estimativa: 1 a 3 minutos (base pequena).", segundos: 120 };
+                if (total <= 6) return { texto: "Estimativa: 3 a 8 minutos (base média).", segundos: 360 };
+                return { texto: "Estimativa: 8+ minutos (lote grande).", segundos: 780 };
+            }
+
+            function atualizarResumoProgresso(segundos, totalEmpreendimentos) {
+                var base = estimativaAtualSegundos > 0 ? estimativaAtualSegundos : 180;
+                var percentual = clamp(Math.round((segundos / base) * 100), 0, 99);
+                var concluidos = clamp(Math.floor((percentual / 100) * totalEmpreendimentos), 0, totalEmpreendimentos);
+                var atual = clamp(concluidos + 1, 1, totalEmpreendimentos);
+
+                if (monitorBarra) monitorBarra.style.width = percentual + "%";
+                if (monitorPercentual) monitorPercentual.textContent = percentual + "%";
+                if (monitorEmpreendimento) {
+                    monitorEmpreendimento.textContent = concluidos + " feito(s) / " + totalEmpreendimentos + " total";
+                }
+                if (monitorItemAtual) {
+                    monitorItemAtual.textContent = "Empreendimento " + atual + " de " + totalEmpreendimentos;
+                }
+                if (monitorStatusCurto) {
+                    monitorStatusCurto.textContent = percentual >= 85 ? "Finalizando lote" : "Em execução";
+                }
+                if (monitorProgressTrack) {
+                    monitorProgressTrack.setAttribute("aria-valuenow", String(percentual));
+                }
+            }
+
+            function aplicarProgressoReal(data) {
+                progressoRealAtivo = true;
+                var total = Math.max(1, Number(data.total_empreendimentos || 1));
+                var concluidos = clamp(Number(data.concluidos || 0), 0, total);
+                var percentualInformado = Number(data.percentual_tempo || 0);
+                var percentualCalc = clamp(Math.round((concluidos / total) * 100), 0, 100);
+                var percentual = percentualInformado > 0 ? clamp(Math.round(percentualInformado), 0, 100) : percentualCalc;
+                var empAtual = data.empreendimento_atual ? String(data.empreendimento_atual) : null;
+                var abasItem = "";
+                if (Array.isArray(data.abas_item) && data.abas_item.length) {
+                    abasItem = data.abas_item.join(" · ");
+                } else if (data.item_atual_abas) {
+                    abasItem = String(data.item_atual_abas);
+                }
+                if (data.status !== "concluido") {
+                    percentual = Math.min(percentual, 99);
+                } else {
+                    percentual = 100;
+                }
+                if (monitorBarra) monitorBarra.style.width = percentual + "%";
+                if (monitorPercentual) monitorPercentual.textContent = percentual + "%";
+                if (monitorEmpreendimento) {
+                    monitorEmpreendimento.textContent = concluidos + " feito(s) / " + total + " total";
+                }
+                if (monitorItemAtual) {
+                    monitorItemAtual.textContent = abasItem || (concluidos >= total ? "Lote finalizado" : "Aguardando próxima aba");
+                }
+                if (monitorItemAbas) {
+                    monitorItemAbas.textContent = empAtual || "Leitura de empreendimento em andamento";
+                }
+                if (monitorStatusCurto) {
+                    if (data.status === "concluido") monitorStatusCurto.textContent = "Concluído";
+                    else if (data.status === "erro") monitorStatusCurto.textContent = "Erro";
+                    else monitorStatusCurto.textContent = "Em execução";
+                }
+                if (statusEl && data.mensagem) {
+                    statusEl.textContent = String(data.mensagem);
+                }
+                if (monitorProgressTrack) {
+                    monitorProgressTrack.setAttribute("aria-valuenow", String(percentual));
+                }
+                if (Array.isArray(data.itens_tempo) && data.itens_tempo.length) {
+                    registrarTemposPorItem(data.itens_tempo);
+                }
+                if (data.status === "concluido" && pollId) {
+                    monitor.classList.add("concluido");
+                    clearInterval(pollId);
+                    pollId = null;
+                    try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                    var tokConcluido = String(data.token || lastProcessToken || "");
+                    if (!jaNotificadoToken(tokConcluido)) {
+                        notificarConclusao(data.mensagem);
+                        marcarNotificadoToken(tokConcluido);
+                    }
+                }
+                if (data.status === "erro") {
+                    try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                }
+            }
+
+            function iniciarPollingProgresso(token) {
+                if (!token) return;
+                if (pollId) clearInterval(pollId);
+                var url = "/progresso-lote/" + encodeURIComponent(token);
+                var consultar = function () {
+                    fetch(url, { cache: "no-store" })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error("status_" + r.status);
+                            return r.json();
+                        })
+                        .then(function (data) {
+                            if (!data || data.ok !== true) return;
+                            if (contadorEstimado && Number(data.estimativa_total_segundos || 0) > 0) {
+                                contadorEstimado.textContent = formatarMmSs(Number(data.estimativa_total_segundos || 0));
+                            }
+                            aplicarProgressoReal(data);
+                        })
+                        .catch(function (err) {
+                            if (String((err && err.message) || "").indexOf("status_404") >= 0) {
+                                try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                            }
+                            /* mantém monitor estimado quando endpoint ainda não respondeu */
+                        });
+                };
+                consultar();
+                pollId = setInterval(consultar, 1500);
             }
 
             function iniciarContador() {
                 inicioMs = Date.now();
-                processamentoAtivo = true;
+                progressoRealAtivo = false;
+                monitor.classList.remove("concluido");
                 monitor.classList.add("ativo");
                 atualizarFaixa(0);
                 contador.textContent = formatarMmSs(0);
                 if (monitorModo) monitorModo.textContent = textoModoMonitor();
-                var nr = inpR && inpR.files ? inpR.files.length : 0;
-                var np = inpP && inpP.files ? inpP.files.length : 0;
-                var ne = inpE && inpE.files ? inpE.files.length : 0;
-                if (monitorEstimativa) monitorEstimativa.textContent = textoEstimativa(nr, np, ne);
+                var totais = calcularTotaisMonitor();
+                var est = textoEstimativa(totais.receber, totais.recebidos, totais.estoque);
+                estimativaAtualSegundos = Number(est.segundos || 0);
+                if (monitorEstimativa) monitorEstimativa.textContent = "";
+                if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(estimativaAtualSegundos || 0);
+                atualizarResumoProgresso(0, totais.totalEmpreendimentos);
                 if (timerId) clearInterval(timerId);
                 timerId = setInterval(function () {
                     var seg = Math.floor((Date.now() - inicioMs) / 1000);
                     contador.textContent = formatarMmSs(seg);
                     atualizarFaixa(seg);
+                    if (!progressoRealAtivo) {
+                        atualizarResumoProgresso(seg, totais.totalEmpreendimentos);
+                    }
                 }, 1000);
             }
 
             if (!form) return;
 
+            function retomarMonitorSeNecessario() {
+                var tokenSalvo = "";
+                try { tokenSalvo = String(localStorage.getItem(ACTIVE_TOKEN_KEY) || ""); } catch (_e) {}
+                var tokenRetomada = (lastProcessToken || tokenSalvo || "").trim();
+                if (!tokenRetomada) return;
+                var url = "/progresso-lote/" + encodeURIComponent(tokenRetomada);
+                fetch(url, { cache: "no-store" })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error("status_" + r.status);
+                        return r.json();
+                    })
+                    .then(function (data) {
+                        if (!data || data.ok !== true) return;
+                        if (data.status === "concluido" || data.status === "erro") {
+                            try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                            return;
+                        }
+                        if (processTokenInput && !processTokenInput.value) {
+                            processTokenInput.value = String(data.token || tokenRetomada);
+                        }
+                        try { localStorage.setItem(ACTIVE_TOKEN_KEY, String(data.token || tokenRetomada)); } catch (_e) {}
+                        iniciarContador();
+                        aplicarProgressoReal(data);
+                        iniciarPollingProgresso(String(data.token || tokenRetomada));
+                    })
+                    .catch(function () {
+                        try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                    });
+            }
+
+            retomarMonitorSeNecessario();
+
             form.addEventListener("submit", function (ev) {
                 var submitter = ev.submitter;
                 var acaoBtn = submitter ? String(submitter.value || "") : "";
-                if (acaoBtn && acaoBtn !== "processar") {
+                /* Só monitora envio explícito "Gerar planilha" (processar). */
+                if (acaoBtn !== "processar") {
                     return;
                 }
                 if (!form.checkValidity()) return;
+                if ("Notification" in window && Notification.permission === "default") {
+                    try { Notification.requestPermission(); } catch (_e) {}
+                }
+                var token = gerarTokenProcesso();
+                if (processTokenInput) processTokenInput.value = token;
+                try { localStorage.setItem(ACTIVE_TOKEN_KEY, token); } catch (_e) {}
                 iniciarContador();
+                iniciarPollingProgresso(token);
                 if (botao) {
                     botao.disabled = true;
                     botao.textContent = "Processando…";
                 }
             });
 
-            window.addEventListener("beforeunload", function (e) {
-                if (!processamentoAtivo) return;
-                e.preventDefault();
-                e.returnValue = "O processamento está em andamento. Deseja realmente sair?";
-            });
-
+            if (lastExecSuccess === 1 && !jaNotificadoToken(lastProcessToken)) {
+                notificarConclusao("Processamento finalizado com sucesso.");
+                marcarNotificadoToken(lastProcessToken);
+            }
         })();
     </script>
 </body>
 </html>
+
+

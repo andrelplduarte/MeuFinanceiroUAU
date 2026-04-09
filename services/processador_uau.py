@@ -66,6 +66,28 @@ MAPA_LINKS_DRIVE_EMPREENDIMENTO = {
     # "ALVLT": "https://drive.google.com/drive/folders/SEU_LINK_AQUI",
 }
 
+# De-para oficial de empreendimento (fonte única para exibição no topo e colunas).
+# Chave: sigla normalizada (ex.: ALVLT). Valor: nome oficial de exibição.
+MAPA_EMPREENDIMENTO_OFICIAL_POR_SIGLA = {
+    "NVLOT": "RES.NILSON VELOSO",
+    "LTMAG": "RES.MAGALHAES",
+    "SCPTO": "LOT.TOCANTINS",
+    "SCPTI": "LOT.TIRADENTES",
+    "CIDAN": "RES.CIDADE NOVA",
+    "VROLT": "LOT.VALE DAS ROSAS",
+    "ALVLT": "RES.ALVORADA",
+    "LTMON": "LOT.MONTE NEGRO",
+    "RVERD": "RIO VERDE",
+    "LTVIL": "LOT.VILA NOVA",
+    "LTMIN": "LOT.MINERIOS",
+    "SCPGO": "RES.GOIANIA",
+    "ARAHF": "RES.ARARAS",
+    "BVGWH": "COND.BELLA WHITE",
+    "MANHA": "MANHATAN",
+    "MONTB": "MONTBLANC",
+    "LIFE": "LIFE",
+}
+
 
 class ProcessamentoUAUErro(Exception):
     """
@@ -601,6 +623,7 @@ def normalizar_emp_obra(txt):
     txt = re.sub(r"\s+", "", txt)
     txt = txt.replace("SCPG O", "SCPGO")
     txt = txt.replace("SCPG0", "SCPGO")
+    txt = txt.replace("51/BVGW", "51/BVGWH")
     if txt == "27/SCPG":
         txt = "27/SCPGO"
     return txt
@@ -3328,6 +3351,32 @@ def _padronizar_rotulo_coluna_exibicao(col) -> str:
     c = str(col or "").strip().upper()
     if not c:
         return c
+    mapa_exato = {
+        "EMP/OBRA": "EMP/OBRA",
+        "VENDA": "VENDA",
+        "CLIENTE": "CLIENTE",
+        "CLIENTE_BASE": "CLI.BASE",
+        "IDENTIFICADOR_PRODUTO": "IDENTIFICADOR",
+        "PARCELA": "PARC.(GERAL)",
+        "PARC_NUM": "PARC.NUM",
+        "PARC_TOTAL": "PARC.TOTAL",
+        "VENCIMENTO": "VENC.DATA",
+        "STATUS_VENCIMENTO": "STATUS",
+        "DIA_VENCIMENTO_BOLETO": "DIA.VENC.",
+        "MES_VENCIMENTO": "MES.VENC.",
+        "ANO_VENCIMENTO": "ANO.VENC.",
+        "CLASSIFICACAO_ADIMPLENCIA": "CLASSIFICAÇÃO",
+        "PRINCIPAL": "PRINCIPAL",
+        "CORRECAO": "CORREÇÃO",
+        "JUROS_ATRASO": "JUROS ATRASO",
+        "MULTA_ATRASO": "MULTA ATRASO",
+        "CORRECAO_ATRASO": "CORREÇÃO ATRASO",
+        "VLR_PARCELA": "VL.PARCELA",
+        "DATA_REC": "DATA.REC.",
+        "TIPO": "TIPO",
+    }
+    if c in mapa_exato:
+        return mapa_exato[c]
     c = c.replace("PARCELAS RECEBIDAS", "QTD.PARC.PAGO")
     c = c.replace("PARCELAS INADIMPLENTES", "QTD.PARC.VENCIDA")
     c = c.replace("PARCELAS A VENCER", "QTD.PARC.A VENCER")
@@ -3795,7 +3844,9 @@ def montar_consolidado(
         ignore_index=True,
     )
     if df_ids_oc.empty:
-        identificador_moda = pd.DataFrame(columns=chave + ["Identificador"])
+        # Somente Venda + Identificador: se incluir Cliente_Base aqui, o merge(on="Venda")
+        # duplica Cliente_Base → Cliente_Base_x / Cliente_Base_y e quebra chave + ["Identificador"].
+        identificador_moda = pd.DataFrame(columns=["Venda", "Identificador"])
     else:
         identificador_moda = (
             df_ids_oc.groupby("Venda", as_index=False)
@@ -3803,6 +3854,15 @@ def montar_consolidado(
             .rename(columns={"id_norm": "Identificador"})
         )
     identificador_final = base_chaves.merge(identificador_moda, on=["Venda"], how="left")
+    if "Cliente_Base" not in identificador_final.columns:
+        if "Cliente_Base_x" in identificador_final.columns:
+            identificador_final = identificador_final.rename(columns={"Cliente_Base_x": "Cliente_Base"})
+            if "Cliente_Base_y" in identificador_final.columns:
+                identificador_final = identificador_final.drop(columns=["Cliente_Base_y"])
+        elif "Cliente_Base_y" in identificador_final.columns:
+            identificador_final = identificador_final.rename(columns={"Cliente_Base_y": "Cliente_Base"})
+        else:
+            identificador_final["Cliente_Base"] = ""
     identificador_final["Identificador"] = identificador_final["Identificador"].fillna("").astype(str).str.strip()
     identificador_final = identificador_final[chave + ["Identificador"]]
     _tick_bloco("identificador_final")
@@ -4032,15 +4092,16 @@ def montar_consolidado(
         "Qtd.Parc.Atrasada", "Vl.Principal Atrasado", "Vl.Correção",
         "Vl.Juros", "Vl.Multas", "Vl.Correção Atraso", "Vl.Vencer"
     ]
-
     for col in colunas_numericas:
         if col not in consolidado.columns:
             consolidado[col] = 0
-        consolidado[col] = consolidado[col].fillna(0)
-
-    for col in ["Qtd.Parc.Total", "Qtd.Parc.Paga", "Qtd.Parc.Atrasada", "Qtd.Parc.A Vencer"]:
-        if col in consolidado.columns:
-            consolidado[col] = consolidado[col].fillna(0).round(0).astype(int)
+    consolidado[colunas_numericas] = (
+        consolidado[colunas_numericas]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0)
+    )
+    colunas_qtd_int = ["Qtd.Parc.Total", "Qtd.Parc.Paga", "Qtd.Parc.Atrasada", "Qtd.Parc.A Vencer"]
+    consolidado[colunas_qtd_int] = consolidado[colunas_qtd_int].round(0).astype(int)
 
     # Piso de auditoria: Qtd.Parc.Total >= max(Paga, Atrasada, A Vencer) após moda por venda.
     if not consolidado.empty:
@@ -5705,22 +5766,32 @@ def aplicar_estilo_excel(
                 valor_ap = str(ws.cell(row=linha, column=col_aporte_num).value or "").strip().upper()
                 aporte_sim = valor_ap == "SIM"
 
-            for col in range(1, max_col_data + 1):
-                cell = ws.cell(row=linha, column=col)
+            row_cells = next(
+                ws.iter_rows(
+                    min_row=linha,
+                    max_row=linha,
+                    min_col=1,
+                    max_col=max_col_data,
+                )
+            )
+            for col, cell in enumerate(row_cells, start=1):
                 cell.alignment = align_centro_dados
                 cell.border = border_data
                 fmt = col_formato_cache[col - 1]
                 if fmt:
                     cell.number_format = fmt
+                if aporte_sim:
+                    cell.fill = fill_aporte_row
+                elif col == col_f_idx:
+                    cell.fill = fill_f
+                elif col == col_x_idx:
+                    cell.fill = fill_x_destaque
 
-            ws.cell(row=linha, column=col_f_idx).fill = fill_f
-            ws.cell(row=linha, column=col_f_idx).font = font_f_bold_preto
-            ws.cell(row=linha, column=col_x_idx).fill = fill_x_destaque
-            if aporte_sim:
-                for col_idx in range(1, max_col_data + 1):
-                    ws.cell(row=linha, column=col_idx).fill = fill_aporte_row
-            ws.cell(row=linha, column=col_k_idx).fill = fill_k
-            ws.cell(row=linha, column=col_k_idx).font = font_f_bold_preto
+            c_f = row_cells[col_f_idx - 1]
+            c_k = row_cells[col_k_idx - 1]
+            c_f.font = font_f_bold_preto
+            c_k.fill = fill_k
+            c_k.font = font_f_bold_preto
 
         colunas_fechamento = ["E", "J", "Q", "S", "X"]
         colunas_fechamento_idx = [column_index_from_string(col) for col in colunas_fechamento]
@@ -5817,20 +5888,20 @@ def aplicar_estilo_excel(
     # Padrao profissional das abas de apoio + resumo no topo.
     formatos_auxiliares = {
         "DADOS RECEBER": {
-            "datas": ["Vencimento", "Venc. Pror."],
-            "moeda": ["Principal", "Correcao", "Juros_Atraso", "Multa_Atraso", "Vlr_Parcela", "Correcao_Atraso"],
-            "inteiros": ["Parc_Num", "Parc_Total"],
+            "datas": ["VENC.DATA"],
+            "moeda": ["PRINCIPAL", "CORREÇÃO", "JUROS ATRASO", "MULTA ATRASO", "VL.PARCELA", "CORREÇÃO ATRASO"],
+            "inteiros": ["VENDA", "PARC.NUM", "PARC.TOTAL", "DIA.VENC.", "ANO.VENC."],
             "col_principal": "Principal",
             "col_pago": None,
             "col_avencer": "Principal",
             "col_inad": "Principal",
         },
         "DADOS RECEBIDOS": {
-            "datas": ["Data_Rec"],
-            "moeda": ["Vlr_Parcela", "Principal", "Correcao", "Multa_Atraso", "Juros_Atraso", "Total_Dep", "Total_Nao_Dep"],
-            "inteiros": ["Parc_Num", "Parc_Total"],
+            "datas": ["DATA.REC."],
+            "moeda": ["VL.PARCELA", "PRINCIPAL", "CORREÇÃO", "MULTA ATRASO", "JUROS ATRASO"],
+            "inteiros": ["VENDA", "PARC.NUM", "PARC.TOTAL"],
             "col_principal": "Principal",
-            "col_pago": "Total_Dep",
+            "col_pago": "VL.PARCELA",
             "col_avencer": None,
             "col_inad": None,
         },
@@ -5871,9 +5942,9 @@ def aplicar_estilo_excel(
         max_row_aux = ws_aux.max_row
 
         if nome_aba == "DADOS RECEBER":
-            col_parcela = mapa_colunas.get("PARCELA", "G")
-            col_vlr = mapa_colunas.get("VLR_PARCELA", "R")
-            col_status = mapa_colunas.get("STATUS_VENCIMENTO", "N")
+            col_parcela = mapa_colunas.get("PARC.(GERAL)", "F")
+            col_vlr = mapa_colunas.get("VL.PARCELA", "T")
+            col_status = mapa_colunas.get("STATUS", "J")
             resumo = [
                 ("QTD.PARCELAS", f"=SUBTOTAL(103,{col_parcela}{data_start}:{col_parcela}1048576)"),
                 ("VL.PARCELAS", f"=SUBTOTAL(109,{col_vlr}{data_start}:{col_vlr}1048576)"),
@@ -5897,8 +5968,8 @@ def aplicar_estilo_excel(
         else:
             col_venda = mapa_colunas.get("VENDA", "B")
             col_cliente = mapa_colunas.get("CLIENTE", "C")
-            col_parcela = mapa_colunas.get("PARCELA", "F")
-            col_pago = mapa_colunas.get("TOTAL_DEP", "L")
+            col_parcela = mapa_colunas.get("PARC.(GERAL)", "F")
+            col_pago = mapa_colunas.get("VL.PARCELA", "M")
             resumo = [
                 ("QTD.VENDAS", f"=SUMPRODUCT(SUBTOTAL(103,OFFSET(${col_venda}${data_start},ROW(${col_venda}${data_start}:${col_venda}1048576)-ROW(${col_venda}${data_start}),0,1))/COUNTIFS(${col_venda}${data_start}:${col_venda}1048576,${col_venda}${data_start}:${col_venda}1048576,${col_venda}${data_start}:${col_venda}1048576,\"<>\"))"),
                 ("QTD.CLIENTES", f"=SUMPRODUCT(SUBTOTAL(103,OFFSET(${col_cliente}${data_start},ROW(${col_cliente}${data_start}:${col_cliente}1048576)-ROW(${col_cliente}${data_start}),0,1))/COUNTIFS(${col_cliente}${data_start}:${col_cliente}1048576,${col_cliente}${data_start}:${col_cliente}1048576,${col_cliente}${data_start}:${col_cliente}1048576,\"<>\"))"),
@@ -6247,24 +6318,10 @@ def processar_e_gerar_excel(
     def _nlin_df(df):
         return 0 if df is None or getattr(df, "empty", True) else len(df)
 
-    def _emit_perf(nome, dt, lr, lp, lc):
-        perf_etapas.append((nome, float(dt)))
-        acum = time.perf_counter() - t_perf0
-        print(
-            f"[TEMPO] {nome}: {dt:.2f}s | acum={acum:.2f}s | "
-            f"receber={lr} | recebidos={lp} | consolidado={lc}"
-        )
-        # Diagnóstico leve de gargalo sem custo alto de serialização.
-        if float(dt) >= 90.0:
-            perf_alertas.append((str(nome), float(dt)))
-            print(
-                f"[ALERTA][GARGALO] etapa={nome} | tempo={dt:.2f}s | "
-                "acao_sugerida=investigar_esta_etapa_primeiro"
-            )
-        if perf_extra_ligado:
-            _emit_perf_extra(nome, dt, lr, lp, lc)
+    def _emit_perf_extra_noop(_nome, _dt, _lr, _lp, _lc):
+        return None
 
-    def _emit_perf_extra(nome, dt, lr, lp, lc):
+    def _emit_perf_extra_real(nome, dt, lr, lp, lc):
         if nome not in etapas_perf_extra:
             return
         total_linhas = max(int(lr or 0) + int(lp or 0), 1)
@@ -6273,6 +6330,25 @@ def processar_e_gerar_excel(
             f"[TEMPO][EXTRA] etapa={nome} | linhas_total={total_linhas} | "
             f"taxa_linhas_s={taxa:.1f} | consolidado={int(lc or 0)}"
         )
+
+    _emit_perf_extra = _emit_perf_extra_real if perf_extra_ligado else _emit_perf_extra_noop
+
+    def _emit_perf(nome, dt, lr, lp, lc):
+        if perf_extra_ligado:
+            perf_etapas.append((nome, float(dt)))
+        acum = time.perf_counter() - t_perf0
+        print(
+            f"[TEMPO] {nome}: {dt:.2f}s | acum={acum:.2f}s | "
+            f"receber={lr} | recebidos={lp} | consolidado={lc}"
+        )
+        # Diagnóstico de gargalo: só com PERF_EXTRA=1 (evita prints extras no fluxo padrão).
+        if float(dt) >= 90.0 and perf_extra_ligado:
+            perf_alertas.append((str(nome), float(dt)))
+            print(
+                f"[ALERTA][GARGALO] etapa={nome} | tempo={dt:.2f}s | "
+                "acao_sugerida=investigar_esta_etapa_primeiro"
+            )
+        _emit_perf_extra(nome, dt, lr, lp, lc)
 
     def _imprimir_ranking_perf():
         if not perf_etapas:
@@ -6949,15 +7025,20 @@ def processar_e_gerar_excel(
                 max_den = max(denoms) if denoms else 0
                 possui_1_1 = "1/1" in pars_set
                 denom_stats = {}
-                for den in sorted([int(x) for x in denoms]):
-                    mask_den = g["_DEN_AUD"] == den
+                for den_val, g_den in g.groupby("_DEN_AUD", sort=False, dropna=False):
+                    try:
+                        den_int = int(den_val)
+                    except (TypeError, ValueError):
+                        continue
+                    if den_int <= 0:
+                        continue
                     parcelas_den = set(
-                        [x for x in g.loc[mask_den, "_PARC_NORM"].tolist() if str(x).strip() != ""]
+                        [x for x in g_den["_PARC_NORM"].tolist() if str(x).strip() != ""]
                     )
                     soma_pri_den = float(
-                        pd.to_numeric(g.loc[mask_den, "_PRI_NUM"], errors="coerce").fillna(0).sum()
+                        pd.to_numeric(g_den["_PRI_NUM"], errors="coerce").fillna(0).sum()
                     )
-                    denom_stats[int(den)] = {
+                    denom_stats[den_int] = {
                         "qtd_parcelas": int(len(parcelas_den)),
                         "soma_principal": float(soma_pri_den),
                     }
@@ -7049,15 +7130,20 @@ def processar_e_gerar_excel(
             max_den = max(denoms) if denoms else 0
             possui_1_1 = "1/1" in pars_set
             denom_stats = {}
-            for den in sorted([int(x) for x in denoms]):
-                mask_den = g2["_DEN_AUD"] == den
+            for den_val, g_den in g2.groupby("_DEN_AUD", sort=False, dropna=False):
+                try:
+                    den_int = int(den_val)
+                except (TypeError, ValueError):
+                    continue
+                if den_int <= 0:
+                    continue
                 parcelas_den = set(
-                    [x for x in g2.loc[mask_den, "_PARC_NORM"].tolist() if str(x).strip() != ""]
+                    [x for x in g_den["_PARC_NORM"].tolist() if str(x).strip() != ""]
                 )
                 soma_pri_den = float(
-                    pd.to_numeric(g2.loc[mask_den, "_PRI_NUM"], errors="coerce").fillna(0).sum()
+                    pd.to_numeric(g_den["_PRI_NUM"], errors="coerce").fillna(0).sum()
                 )
-                denom_stats[int(den)] = {
+                denom_stats[den_int] = {
                     "qtd_parcelas": int(len(parcelas_den)),
                     "soma_principal": float(soma_pri_den),
                 }
@@ -7164,41 +7250,135 @@ def processar_e_gerar_excel(
         qtd_subgrupos_avaliados = 0
         _empty_df = pd.DataFrame()
 
-        def _mapa_subgrupos_df(df_venda):
-            if df_venda is None or df_venda.empty:
-                return {}
-            if "_CB_KEY" not in df_venda.columns or "_K_SUB" not in df_venda.columns:
-                return {}
-            out = {}
-            for (cbk, ksub), g in df_venda.groupby(["_CB_KEY", "_K_SUB"], sort=False, dropna=False):
-                out[(str(cbk).strip(), str(ksub).strip())] = g
-            return out
-
         def _metricas_parcelas_df(df_part):
             if df_part is None or df_part.empty or "Parcela" not in df_part.columns:
                 return 0, set()
-            pars_norm = df_part["Parcela"].map(normalizar_parcela)
+            if "_PARC_NORM" in df_part.columns:
+                pars_norm = df_part["_PARC_NORM"]
+            else:
+                pars_norm = df_part["Parcela"].map(normalizar_parcela)
             vals = [p for p in pars_norm.tolist() if p]
             if not vals:
                 return 0, set()
             s = set(vals)
             return int(len(s)), s
 
-        def _metricas_parcelas_por_subgrupo(df_venda):
+        def _mapa_metricas_venda_total(df_src):
+            """Métricas de parcelas por venda inteira (evita recomputar a cada iteração do consolidado)."""
             out = {}
-            if df_venda is None or df_venda.empty:
+            if df_src is None or df_src.empty or "Venda" not in df_src.columns:
                 return out
-            if "_CB_KEY" not in df_venda.columns or "_K_SUB" not in df_venda.columns:
+            vk = df_src["Venda"].fillna("").astype(str).str.strip()
+            base = df_src.loc[vk.ne("")]
+            if base.empty:
                 return out
-            for (cbk, ksub), g in df_venda.groupby(["_CB_KEY", "_K_SUB"], sort=False, dropna=False):
-                out[(str(cbk).strip(), str(ksub).strip())] = _metricas_parcelas_df(g)
+            for v_key, g in base.groupby("Venda", sort=False, dropna=False):
+                vs = str(v_key).strip()
+                if not vs:
+                    continue
+                out[vs] = _metricas_parcelas_df(g)
             return out
 
-        for idx_valid, (_, row) in enumerate(df_c.iterrows(), start=1):
-            venda = str(row.get("Venda", "")).strip()
+        def _mapa_subgrupos_somente_por_venda(df_src):
+            """Slices por subgrupo (sem métricas; ex.: df_r)."""
+            out = {}
+            if df_src is None or df_src.empty:
+                return out
+            if "Venda" not in df_src.columns or "_CB_KEY" not in df_src.columns or "_K_SUB" not in df_src.columns:
+                return out
+            base = df_src.loc[df_src["Venda"].fillna("").astype(str).str.strip().ne("")]
+            if base.empty:
+                return out
+            for venda_key, df_venda in base.groupby("Venda", sort=False, dropna=False):
+                vs = str(venda_key).strip()
+                if not vs:
+                    continue
+                mapa_sub = {}
+                for (cbk, ksub), g in df_venda.groupby(["_CB_KEY", "_K_SUB"], sort=False, dropna=False):
+                    mapa_sub[(str(cbk).strip(), str(ksub).strip())] = g
+                out[vs] = mapa_sub
+            return out
+
+        def _mapa_subgrupos_e_metricas_por_venda(df_src):
+            """Uma passagem: DataFrames por subgrupo + métricas de parcelas (evita 2x groupby no mesmo df)."""
+            out_sub = {}
+            out_met = {}
+            if df_src is None or df_src.empty:
+                return out_sub, out_met
+            if "Venda" not in df_src.columns or "_CB_KEY" not in df_src.columns or "_K_SUB" not in df_src.columns:
+                return out_sub, out_met
+            base = df_src.loc[df_src["Venda"].fillna("").astype(str).str.strip().ne("")]
+            if base.empty:
+                return out_sub, out_met
+            for venda_key, df_venda in base.groupby("Venda", sort=False, dropna=False):
+                vs = str(venda_key).strip()
+                if not vs:
+                    continue
+                m_sub = {}
+                m_met = {}
+                for (cbk, ksub), g in df_venda.groupby(["_CB_KEY", "_K_SUB"], sort=False, dropna=False):
+                    key = (str(cbk).strip(), str(ksub).strip())
+                    m_sub[key] = g
+                    m_met[key] = _metricas_parcelas_df(g)
+                out_sub[vs] = m_sub
+                out_met[vs] = m_met
+            return out_sub, out_met
+
+        mapa_sub_p_por_venda, mapa_metricas_sub_p_por_venda = _mapa_subgrupos_e_metricas_por_venda(df_p)
+        mapa_sub_v_por_venda, mapa_metricas_sub_v_por_venda = _mapa_subgrupos_e_metricas_por_venda(df_venc)
+        mapa_sub_a_por_venda, mapa_metricas_sub_a_por_venda = _mapa_subgrupos_e_metricas_por_venda(df_av)
+        mapa_sub_r_por_venda = _mapa_subgrupos_somente_por_venda(df_r)
+
+        metrics_venda_total_p = _mapa_metricas_venda_total(df_p)
+        metrics_venda_total_venc = _mapa_metricas_venda_total(df_venc)
+        metrics_venda_total_av = _mapa_metricas_venda_total(df_av)
+
+        _n_df_c = len(df_c)
+
+        def _col_list_str(df, col, n):
+            if col not in df.columns:
+                return [""] * n
+            return df[col].fillna("").astype(str).str.strip().tolist()
+
+        def _col_list_float(df, col, n):
+            if col not in df.columns:
+                return [0.0] * n
+            return pd.to_numeric(df[col], errors="coerce").fillna(0.0).tolist()
+
+        _c_venda = _col_list_str(df_c, "Venda", _n_df_c)
+        _c_cli = _col_list_str(df_c, "Cliente", _n_df_c)
+        _c_id = _col_list_str(df_c, "Identificador", _n_df_c)
+        _c_qtd_paga = _col_list_float(df_c, "Qtd.Parc.Paga", _n_df_c)
+        _c_qtd_atr = _col_list_float(df_c, "Qtd.Parc.Atrasada", _n_df_c)
+        _c_qtd_av = _col_list_float(df_c, "Qtd.Parc.A Vencer", _n_df_c)
+        _c_qtd_tot = _col_list_float(df_c, "Qtd.Parc.Total", _n_df_c)
+        _c_valparc = _col_list_float(df_c, "Valor Da Parcela", _n_df_c)
+        _c_vl_enc = _col_list_float(df_c, "Vl.Principal (Encargos)", _n_df_c)
+        _c_vl_vencer = _col_list_float(df_c, "Vl.Vencer", _n_df_c)
+
+        _cols_p_empty = (
+            list(df_p.columns) if df_p is not None and not df_p.empty else ["Venda", "Parcela", "Principal"]
+        )
+        _cols_venc_empty = list(df_venc.columns) if not df_venc.empty else []
+        _cols_av_empty = list(df_av.columns) if not df_av.empty else []
+        _cols_r_empty = list(df_r.columns) if not df_r.empty else []
+
+        for i in range(_n_df_c):
+            idx_valid = i + 1
+            venda = str(_c_venda[i] or "").strip()
             if venda == "":
                 continue
-            if (idx_valid % 200) == 0:
+            row = {
+                "Venda": venda,
+                "Cliente": str(_c_cli[i] or "").strip(),
+                "Identificador": str(_c_id[i] or "").strip(),
+                "Qtd.Parc.Paga": float(_c_qtd_paga[i]),
+                "Qtd.Parc.Atrasada": float(_c_qtd_atr[i]),
+                "Qtd.Parc.A Vencer": float(_c_qtd_av[i]),
+                "Qtd.Parc.Total": float(_c_qtd_tot[i]),
+                "Valor Da Parcela": float(_c_valparc[i]),
+            }
+            if perf_extra_ligado and (idx_valid % 200) == 0:
                 print(
                     f"[TEMPO][VALIDACAO_PROGRESSO] "
                     f"processadas={idx_valid}/{total_vendas_validacao} "
@@ -7481,16 +7661,16 @@ def processar_e_gerar_excel(
             sva = cache_df_venda_av.get(venda) if cache_df_venda_av else None
             svr = cache_df_venda_r.get(venda) if cache_df_venda_r else None
             _t_sg_filt = time.perf_counter()
-            mapa_sub_p = _mapa_subgrupos_df(svp)
-            mapa_sub_v = _mapa_subgrupos_df(svv)
-            mapa_sub_a = _mapa_subgrupos_df(sva)
-            mapa_sub_r = _mapa_subgrupos_df(svr)
-            mapa_metricas_sub_p = _metricas_parcelas_por_subgrupo(svp)
-            mapa_metricas_sub_v = _metricas_parcelas_por_subgrupo(svv)
-            mapa_metricas_sub_a = _metricas_parcelas_por_subgrupo(sva)
-            venda_metricas_p = _metricas_parcelas_df(svp)
-            venda_metricas_v = _metricas_parcelas_df(svv)
-            venda_metricas_a = _metricas_parcelas_df(sva)
+            mapa_sub_p = mapa_sub_p_por_venda.get(venda, {})
+            mapa_sub_v = mapa_sub_v_por_venda.get(venda, {})
+            mapa_sub_a = mapa_sub_a_por_venda.get(venda, {})
+            mapa_sub_r = mapa_sub_r_por_venda.get(venda, {})
+            mapa_metricas_sub_p = mapa_metricas_sub_p_por_venda.get(venda, {})
+            mapa_metricas_sub_v = mapa_metricas_sub_v_por_venda.get(venda, {})
+            mapa_metricas_sub_a = mapa_metricas_sub_a_por_venda.get(venda, {})
+            venda_metricas_p = metrics_venda_total_p.get(venda, (0, set()))
+            venda_metricas_v = metrics_venda_total_venc.get(venda, (0, set()))
+            venda_metricas_a = metrics_venda_total_av.get(venda, (0, set()))
             tempo_subgrupos_filtragem += (time.perf_counter() - _t_sg_filt)
 
             def _resumo_divergencia_sub(causa_str, idx_sg, cbf_sg, ks_sg):
@@ -7567,17 +7747,16 @@ def processar_e_gerar_excel(
                     qtd_venc_sub, set_venc_sub = mapa_metricas_sub_v.get(k_sub_key, (0, set()))
                     qtd_av_sub, set_av_sub = mapa_metricas_sub_a.get(k_sub_key, (0, set()))
 
-                cols_p = list(df_p.columns) if df_p is not None and not df_p.empty else ["Venda", "Parcela", "Principal"]
-                tmp_p = sp_df if not sp_df.empty else pd.DataFrame(columns=cols_p)
+                tmp_p = sp_df if not sp_df.empty else pd.DataFrame(columns=_cols_p_empty)
                 if not df_venc.empty:
-                    tmp_venc = sv_df if not sv_df.empty else pd.DataFrame(columns=list(df_venc.columns))
+                    tmp_venc = sv_df if not sv_df.empty else pd.DataFrame(columns=_cols_venc_empty)
                 else:
                     tmp_venc = pd.DataFrame()
                 if not df_av.empty:
-                    tmp_av = sa_df if not sa_df.empty else pd.DataFrame(columns=list(df_av.columns))
+                    tmp_av = sa_df if not sa_df.empty else pd.DataFrame(columns=_cols_av_empty)
                 else:
                     tmp_av = pd.DataFrame()
-                tmp_r = sr_vc if not sr_vc.empty else pd.DataFrame(columns=list(df_r.columns))
+                tmp_r = sr_vc if not sr_vc.empty else pd.DataFrame(columns=_cols_r_empty)
 
                 soma_fechamento_sub = int(qtd_pago_sub + qtd_venc_sub + qtd_av_sub)
                 _t_sg_norm = time.perf_counter()
@@ -7790,18 +7969,18 @@ def processar_e_gerar_excel(
             if str(venda).strip() == "":
                 continue
             mapa_parcela[str(venda).strip()] = moda_valor_parcela_por_df_ou_grupo(g)
-        for _, row in df_c.iterrows():
-            venda = str(row.get("Venda", "")).strip()
+        for i in range(_n_df_c):
+            venda = str(_c_venda[i] or "").strip()
             esperado = float(mapa_parcela.get(venda, 0) or 0)
-            encontrado = float(row.get("Valor Da Parcela", 0) or 0)
+            encontrado = float(_c_valparc[i] or 0)
             if esperado > 0 and encontrado <= 0:
                 _pendencia_pre_export(
                     "VAL-PARCELA",
                     "Valor Da Parcela zerado indevido",
                     f"Moda nas bases={esperado:.2f}; consolidado={encontrado:.2f}.",
                     venda,
-                    str(row.get("Cliente", "") or "").strip(),
-                    str(row.get("Identificador", "") or "").strip(),
+                    str(_c_cli[i] or "").strip(),
+                    str(_c_id[i] or "").strip(),
                     valor_vp=float(encontrado),
                 )
                 break
@@ -7811,8 +7990,8 @@ def processar_e_gerar_excel(
                     "Valor Da Parcela divergente da moda",
                     f"Moda nas bases={esperado:.2f}; consolidado={encontrado:.2f}.",
                     venda,
-                    str(row.get("Cliente", "") or "").strip(),
-                    str(row.get("Identificador", "") or "").strip(),
+                    str(_c_cli[i] or "").strip(),
+                    str(_c_id[i] or "").strip(),
                     valor_vp=float(encontrado),
                 )
                 break
@@ -7850,44 +8029,44 @@ def processar_e_gerar_excel(
                 mapa_id[str(venda).strip()] = sorted(cands, key=lambda x: (-score_identificador(x), -len(str(x)), str(x)))[0]
 
         if mapa_id:
-            for _, row in df_c.iterrows():
-                venda = str(row.get("Venda", "")).strip()
+            for i in range(_n_df_c):
+                venda = str(_c_venda[i] or "").strip()
                 esperado = str(mapa_id.get(venda, "")).strip()
                 if esperado == "":
                     continue
-                encontrado = str(row.get("Identificador", "")).strip()
+                encontrado = str(_c_id[i] or "").strip()
                 if encontrado != esperado:
                     _pendencia_pre_export(
                         "VAL-IDENTIFICADOR",
                         "Identificador divergente da moda nas bases",
                         f"Esperado={esperado!r} | Consolidado={encontrado!r}.",
                         venda,
-                        str(row.get("Cliente", "") or "").strip(),
+                        str(_c_cli[i] or "").strip(),
                         encontrado,
                     )
                     break
 
         # Zeros críticos indevidos quando base possui valor
-        for _, row in df_c.iterrows():
-            venda = str(row.get("Venda", "")).strip()
-            if int(cache_qtd_por_venda_venc.get(venda, 0)) > 0 and float(row.get("Vl.Principal (Encargos)", 0) or 0) <= 0:
+        for i in range(_n_df_c):
+            venda = str(_c_venda[i] or "").strip()
+            if int(cache_qtd_por_venda_venc.get(venda, 0)) > 0 and float(_c_vl_enc[i] or 0) <= 0:
                 _pendencia_pre_export(
                     "VAL-CRITICO_INAD",
                     "Inadimplência zerada com parcelas VENCIDO na base",
                     f"Qtd parcelas VENCIDO na base tratada={int(cache_qtd_por_venda_venc.get(venda, 0))}.",
                     venda,
-                    str(row.get("Cliente", "") or "").strip(),
-                    str(row.get("Identificador", "") or "").strip(),
+                    str(_c_cli[i] or "").strip(),
+                    str(_c_id[i] or "").strip(),
                 )
                 break
-            if int(cache_qtd_por_venda_av.get(venda, 0)) > 0 and float(row.get("Vl.Vencer", 0) or 0) <= 0:
+            if int(cache_qtd_por_venda_av.get(venda, 0)) > 0 and float(_c_vl_vencer[i] or 0) <= 0:
                 _pendencia_pre_export(
                     "VAL-CRITICO_AVENCER",
                     "A vencer zerado com parcelas A VENCER na base",
                     f"Qtd parcelas A VENCER na base tratada={int(cache_qtd_por_venda_av.get(venda, 0))}.",
                     venda,
-                    str(row.get("Cliente", "") or "").strip(),
-                    str(row.get("Identificador", "") or "").strip(),
+                    str(_c_cli[i] or "").strip(),
+                    str(_c_id[i] or "").strip(),
                 )
                 break
 
@@ -7925,24 +8104,26 @@ def processar_e_gerar_excel(
                 f"total_a_vencer={total_avencer:.2f} | vendas_div_parcelas={qtd_div_parcelas} | "
                 f"vendas_sem_identificador={qtd_sem_identificador}"
             )
-        print(
-            f"[TEMPO] _validar_pre_exportacao.subgrupos: {tempo_subgrupos_total:.2f}s | "
-            f"subgrupos_avaliados={qtd_subgrupos_avaliados}"
-        )
-        print(
-            f"[TEMPO] _validar_pre_exportacao.subgrupos_partes: "
-            f"filtragem={tempo_subgrupos_filtragem:.2f}s | "
-            f"normalizacao_agregacao={tempo_subgrupos_norm_agreg:.2f}s | "
-            f"comparacao_alertas={tempo_subgrupos_comp_alert:.2f}s"
-        )
+        if perf_extra_ligado:
+            print(
+                f"[TEMPO] _validar_pre_exportacao.subgrupos: {tempo_subgrupos_total:.2f}s | "
+                f"subgrupos_avaliados={qtd_subgrupos_avaliados}"
+            )
+            print(
+                f"[TEMPO] _validar_pre_exportacao.subgrupos_partes: "
+                f"filtragem={tempo_subgrupos_filtragem:.2f}s | "
+                f"normalizacao_agregacao={tempo_subgrupos_norm_agreg:.2f}s | "
+                f"comparacao_alertas={tempo_subgrupos_comp_alert:.2f}s"
+            )
         _tempo_blocos["checagens_finais"] += (time.perf_counter() - _t_finais)
-        print(
-            f"[TEMPO] _validar_pre_exportacao.preparacao_inicial: {_tempo_blocos['preparacao_inicial']:.2f}s | "
-            f"mapas_agregados: {_tempo_blocos['mapas_agregados']:.2f}s | "
-            f"loop_vendas: {_tempo_blocos['validacao_loop_vendas']:.2f}s | "
-            f"subgrupos: {_tempo_blocos['auditoria_subgrupos']:.2f}s | "
-            f"checagens_finais: {_tempo_blocos['checagens_finais']:.2f}s"
-        )
+        if perf_extra_ligado:
+            print(
+                f"[TEMPO] _validar_pre_exportacao.preparacao_inicial: {_tempo_blocos['preparacao_inicial']:.2f}s | "
+                f"mapas_agregados: {_tempo_blocos['mapas_agregados']:.2f}s | "
+                f"loop_vendas: {_tempo_blocos['validacao_loop_vendas']:.2f}s | "
+                f"subgrupos: {_tempo_blocos['auditoria_subgrupos']:.2f}s | "
+                f"checagens_finais: {_tempo_blocos['checagens_finais']:.2f}s"
+            )
 
         return erros, contexto_primeira_falha, pendencias_parcelas
 
@@ -8120,18 +8301,113 @@ def processar_e_gerar_excel(
         ]
         return df.drop(columns=drop) if drop else df
 
+    def _mapa_identificador_estrito(*dfs):
+        base = {}
+        for df in dfs:
+            if df is None or df.empty:
+                continue
+            for _, row in df.iterrows():
+                venda = str(row.get("Venda", "") or "").strip()
+                cli_b = str(row.get("Cliente_Base", "") or "").strip()
+                if not venda or not cli_b:
+                    continue
+                cand = []
+                for col in ("Identificador_Produto", "Unidades"):
+                    raw = row.get(col, "")
+                    if raw is None or str(raw).strip() == "":
+                        continue
+                    if identificador_truncado(raw):
+                        continue
+                    nid = normalizar_identificador(raw)
+                    if nid:
+                        cand.append(nid)
+                if not cand:
+                    continue
+                chave = (venda, cli_b)
+                bucket = base.setdefault(chave, [])
+                bucket.extend(cand)
+        return {
+            k: moda_identificador_final_serie(pd.Series(v))
+            for k, v in base.items()
+            if v
+        }
+
+    def _resolver_identificador_export(row, mapa_id):
+        for col in ("Identificador_Produto", "Unidades"):
+            raw = row.get(col, "")
+            if raw is None or str(raw).strip() == "":
+                continue
+            if identificador_truncado(raw):
+                continue
+            nid = normalizar_identificador(raw)
+            if nid:
+                return nid
+        venda = str(row.get("Venda", "") or "").strip()
+        cli_b = str(row.get("Cliente_Base", "") or "").strip()
+        if venda and cli_b:
+            from_map = str(mapa_id.get((venda, cli_b), "") or "").strip()
+            if from_map:
+                return from_map
+        return "NLOC"
+
     _t_xlsx = time.perf_counter()
+    # Colunas auxiliares solicitadas para DADOS RECEBER:
+    # - DIA_VENCIMENTO_BOLETO: dia do mês extraído do vencimento
+    # - MES_VENCIMENTO / ANO_VENCIMENTO: referência temporal tabular
+    # - CLASSIFICACAO_ADIMPLENCIA: adimplente/inadimplente por status de vencimento
+    if df_receber_tratado is not None and not df_receber_tratado.empty:
+        _venc_dt = pd.to_datetime(df_receber_tratado.get("Vencimento"), errors="coerce")
+        df_receber_tratado["DIA_VENCIMENTO_BOLETO"] = _venc_dt.dt.day.fillna(0).astype(int)
+        _meses_pt = {
+            1: "JANEIRO",
+            2: "FEVEREIRO",
+            3: "MARÇO",
+            4: "ABRIL",
+            5: "MAIO",
+            6: "JUNHO",
+            7: "JULHO",
+            8: "AGOSTO",
+            9: "SETEMBRO",
+            10: "OUTUBRO",
+            11: "NOVEMBRO",
+            12: "DEZEMBRO",
+        }
+        _mes_num = _venc_dt.dt.month
+        df_receber_tratado["MES_VENCIMENTO"] = _mes_num.map(_meses_pt).fillna("")
+        df_receber_tratado["ANO_VENCIMENTO"] = _venc_dt.dt.year.fillna(0).astype(int)
+        _st_v = (
+            df_receber_tratado.get("Status_Vencimento", "")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+        df_receber_tratado["CLASSIFICACAO_ADIMPLENCIA"] = _st_v.map(
+            {
+                "VENCIDO": "INADIMPLENTE",
+                "A VENCER": "ADIMPLENTE",
+            }
+        ).fillna("")
+    mapa_id_estrito = _mapa_identificador_estrito(df_receber_tratado, df_recebidos_tratado)
+    if df_receber_tratado is not None and not df_receber_tratado.empty:
+        df_receber_tratado["Identificador_Produto"] = df_receber_tratado.apply(
+            lambda r: _resolver_identificador_export(r, mapa_id_estrito), axis=1
+        )
+    if df_recebidos_tratado is not None and not df_recebidos_tratado.empty:
+        df_recebidos_tratado["Identificador_Produto"] = df_recebidos_tratado.apply(
+            lambda r: _resolver_identificador_export(r, mapa_id_estrito), axis=1
+        )
+
     df_receber = _ordenar_colunas(_sem_colunas_internas_export(df_receber_tratado), [
-        "Emp/Obra", "Venda", "Cliente", "Cliente_Base", "Unidades", "Identificador_Produto",
-        "Parcela", "Parc_Num", "Parc_Total", "Vencimento", "Venc. Pror.", "Status_Vencimento",
+        "Emp/Obra", "Venda", "Cliente", "Cliente_Base", "Identificador_Produto",
+        "Parcela", "Parc_Num", "Parc_Total", "Vencimento", "Status_Vencimento",
+        "DIA_VENCIMENTO_BOLETO", "MES_VENCIMENTO", "ANO_VENCIMENTO", "CLASSIFICACAO_ADIMPLENCIA",
         "Principal", "Correcao", "Juros_Atraso", "Multa_Atraso", "Correcao_Atraso", "Vlr_Parcela",
-        "Descricao_Produto", "Nr_Person", "Produto", "Qtde_Produto"
     ])
     df_recebidos = _ordenar_colunas(_sem_colunas_internas_export(df_recebidos_tratado), [
-        "Emp/Obra", "Venda", "Cliente", "Cliente_Base", "Unidades", "Identificador_Produto",
+        "Emp/Obra", "Venda", "Cliente", "Cliente_Base", "Identificador_Produto",
         "Parcela", "Parc_Num", "Parc_Total", "Data_Rec", "Tipo",
-        "Principal", "Correcao", "Juros_Atraso", "Multa_Atraso", "Vlr_Parcela", "Total_Dep", "Total_Nao_Dep",
-        "Descricao_Produto", "Nr_Person", "Produto", "Qtde_Produto"
+        "Principal", "Correcao", "Juros_Atraso", "Multa_Atraso", "Vlr_Parcela"
     ])
     nome_aba_analitico = "DADOS GERAL"
     df_relatorio_analitico = montar_dataframe_relatorio_analitico(df_receber, df_recebidos)
@@ -8375,5 +8651,6 @@ def processar_e_gerar_excel(
     fim_execucao = time.time()
     tempo_total = fim_execucao - inicio_execucao
     print(f"[INFO] Tempo de execução: {tempo_total:.2f} segundos")
-    _imprimir_ranking_perf()
+    if perf_extra_ligado:
+        _imprimir_ranking_perf()
     return caminho_saida_final, tempo_total
