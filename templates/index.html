@@ -74,31 +74,389 @@
             min-width: 0;
         }
 
-        /* Cabeçalho */
+        /* Cabeçalho — hero editorial / produto */
         header.hero {
+            margin-bottom: clamp(36px, 5vw, 52px);
+            padding-top: clamp(8px, 2vw, 20px);
             text-align: center;
-            margin-bottom: 44px;
-            padding-top: 12px;
         }
 
-        .hero-art-wrap {
+        .hero-v2 {
+            position: relative;
             width: 100%;
+            max-width: 1080px;
+            margin: 0 auto;
+            isolation: isolate;
+            padding: clamp(4px, 1vw, 12px) 0;
+        }
+
+        .hero-v2__mesh {
+            position: absolute;
+            inset: -12% -8% 40% -8%;
+            background:
+                radial-gradient(ellipse 55% 45% at 18% 35%, rgba(212, 36, 62, 0.22) 0%, transparent 55%),
+                radial-gradient(ellipse 50% 40% at 88% 25%, rgba(77, 142, 255, 0.12) 0%, transparent 50%),
+                radial-gradient(ellipse 40% 35% at 70% 85%, rgba(46, 184, 114, 0.06) 0%, transparent 45%);
+            filter: blur(32px);
+            pointer-events: none;
+            z-index: 0;
+            animation: hero-mesh-drift 14s ease-in-out infinite alternate;
+        }
+
+        @keyframes hero-mesh-drift {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(2%, -1.5%) scale(1.04); opacity: 0.92; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-v2__mesh { animation: none; }
+        }
+
+        .hero-v2__grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(ellipse 85% 70% at 35% 40%, #000 0%, transparent 72%);
+            -webkit-mask-image: radial-gradient(ellipse 85% 70% at 35% 40%, #000 0%, transparent 72%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero-v2__layout {
+            position: relative;
+            z-index: 1;
             display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+            gap: clamp(28px, 5vw, 48px);
+        }
+
+        .hero-v2__copy {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1 1 min(100%, 420px);
+            max-width: 36rem;
+            order: 2;
+            margin-left: auto;
+            margin-right: 0;
+            text-align: center;
+        }
+
+        .hero-v2__eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 18px;
+            padding: 6px 14px 6px 10px;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+        }
+
+        .hero-v2__pulse {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 0 0 rgba(46, 184, 114, 0.45);
+            animation: hero-pulse-ring 2.2s ease-out infinite;
+        }
+
+        @keyframes hero-pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(46, 184, 114, 0.45); }
+            70% { box-shadow: 0 0 0 10px rgba(46, 184, 114, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 184, 114, 0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-v2__pulse { animation: none; box-shadow: 0 0 10px rgba(46, 184, 114, 0.4); }
+        }
+
+        .hero-v2__title {
+            margin: 0;
+            width: 100%;
+            font-size: clamp(2.5rem, 8.5vw, 4.25rem);
+            font-weight: 800;
+            letter-spacing: -0.055em;
+            line-height: 0.95;
+            color: var(--text);
+            text-align: center;
+        }
+
+        .hero-v2__title-prefix {
+            display: block;
+            font-size: 0.34em;
+            font-weight: 600;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.28em;
+        }
+
+        .hero-v2__title-gradient {
+            display: block;
+            margin-top: 0;
+            background: linear-gradient(
+                105deg,
+                #ffffff 0%,
+                #f0f2f5 18%,
+                #d4243e 42%,
+                #ff6b7d 52%,
+                #4d8eff 78%,
+                #e8ecf2 100%
+            );
+            background-size: 220% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: hero-title-flow 10s linear infinite;
+        }
+
+        @keyframes hero-title-flow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-v2__title-gradient { animation: none; background-position: 40% 50%; }
+        }
+
+        .hero-v2__subtitle {
+            margin: clamp(14px, 2.5vw, 20px) auto 0;
+            width: 100%;
+            max-width: 28em;
+            font-size: clamp(0.9375rem, 2.2vw, 1.0625rem);
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .hero-v2__lead {
+            margin: clamp(18px, 3vw, 26px) auto 0;
+            width: 100%;
+            max-width: 36em;
+            font-size: clamp(0.875rem, 1.9vw, 0.9375rem);
+            line-height: 1.65;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .hero-v2__lead strong {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .hero-v2__chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: clamp(22px, 3.5vw, 30px) 0 0;
+            padding: 0;
+            list-style: none;
             justify-content: center;
         }
 
-        .hero-art {
-            width: min(720px, 70vw);
-            height: auto;
-            display: block;
-            border-radius: 18px;
-            border: none;
-            box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+        .hero-v2__chips li {
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid var(--border);
+            transition: border-color 0.2s ease, background 0.2s ease;
         }
 
-        @media (max-width: 860px) {
-            .hero-art {
-                border-radius: 14px;
+        .hero-v2__chips li:hover {
+            border-color: rgba(212, 36, 62, 0.35);
+            background: rgba(212, 36, 62, 0.08);
+        }
+
+        .hero-v2__visual {
+            flex: 0 0 auto;
+            position: relative;
+            width: min(300px, 54vw);
+            height: min(340px, 62vw);
+            order: 1;
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        .hero-v2__logo-glow {
+            position: absolute;
+            inset: -14% -10% 4% -10%;
+            background:
+                radial-gradient(ellipse 72% 58% at 70% 26%, rgba(212, 36, 62, 0.48) 0%, transparent 58%),
+                radial-gradient(ellipse 68% 52% at 24% 76%, rgba(77, 142, 255, 0.32) 0%, transparent 55%),
+                radial-gradient(ellipse 45% 40% at 50% 50%, rgba(255, 138, 155, 0.12) 0%, transparent 60%);
+            filter: blur(24px);
+            pointer-events: none;
+            z-index: 0;
+            animation: hero-logo-glow-pulse 3.8s ease-in-out infinite;
+        }
+
+        @keyframes hero-logo-glow-pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+                filter: blur(24px);
+            }
+            33% {
+                opacity: 0.92;
+                transform: scale(1.05) translate(2%, -1%);
+                filter: blur(28px);
+            }
+            66% {
+                opacity: 0.98;
+                transform: scale(1.02) translate(-1%, 1%);
+                filter: blur(22px);
+            }
+        }
+
+        .hero-v2__logo {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-v2__logo-svg {
+            width: 100%;
+            height: auto;
+            max-height: 100%;
+            overflow: visible;
+            animation: hero-logo-svg-glow 3.2s ease-in-out infinite;
+        }
+
+        @keyframes hero-logo-svg-glow {
+            0%, 100% {
+                filter:
+                    drop-shadow(0 14px 32px rgba(0, 0, 0, 0.48))
+                    drop-shadow(0 0 22px rgba(212, 36, 62, 0.35))
+                    drop-shadow(0 0 36px rgba(77, 142, 255, 0.12));
+            }
+            50% {
+                filter:
+                    drop-shadow(0 16px 36px rgba(0, 0, 0, 0.52))
+                    drop-shadow(0 0 32px rgba(77, 142, 255, 0.38))
+                    drop-shadow(0 0 44px rgba(212, 36, 62, 0.22));
+            }
+        }
+
+        .hero-v2__logo-svg .hero-logo-float {
+            transform-origin: 80px 90px;
+            animation: hero-logo-float 5s ease-in-out infinite;
+        }
+
+        @keyframes hero-logo-float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-7px) rotate(0.6deg); }
+        }
+
+        .hero-v2__logo-svg .hero-logo-frame {
+            animation: hero-logo-frame-pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes hero-logo-frame-pulse {
+            0%, 100% { stroke-opacity: 0.5; }
+            50% { stroke-opacity: 0.85; }
+        }
+
+        .hero-v2__logo-svg .hero-logo-chart {
+            stroke-dasharray: 10 14;
+            stroke-dashoffset: 0;
+            animation: hero-logo-chart-flow 2.4s linear infinite;
+        }
+
+        @keyframes hero-logo-chart-flow {
+            to { stroke-dashoffset: -48; }
+        }
+
+        .hero-v2__logo-svg .hero-logo-chart-glow {
+            stroke-dasharray: 10 14;
+            stroke-dashoffset: 6;
+            animation: hero-logo-chart-flow 2.4s linear infinite reverse;
+            opacity: 0.55;
+        }
+
+        .hero-v2__logo-svg .hero-logo-node {
+            transform-origin: center;
+            animation: hero-logo-node 2.2s ease-in-out infinite;
+        }
+
+        .hero-v2__logo-svg .hero-logo-node--1 { animation-delay: 0s; }
+        .hero-v2__logo-svg .hero-logo-node--2 { animation-delay: 0.18s; }
+        .hero-v2__logo-svg .hero-logo-node--3 { animation-delay: 0.36s; }
+        .hero-v2__logo-svg .hero-logo-node--4 { animation-delay: 0.54s; }
+
+        @keyframes hero-logo-node {
+            0%, 100% { opacity: 0.75; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.35); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-v2__logo-glow { animation: none; }
+            .hero-v2__logo-svg { animation: none; filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45)); }
+            .hero-v2__logo-svg .hero-logo-float { animation: none; }
+            .hero-v2__logo-svg .hero-logo-frame { animation: none; stroke-opacity: 0.55; }
+            .hero-v2__logo-svg .hero-logo-chart,
+            .hero-v2__logo-svg .hero-logo-chart-glow { animation: none; stroke-dasharray: unset; stroke-dashoffset: 0; }
+            .hero-v2__logo-svg .hero-logo-node { animation: none; opacity: 0.95; transform: none; }
+        }
+
+        @media (min-width: 721px) {
+            header.hero { text-align: center; }
+            .hero-v2__copy {
+                align-items: center;
+                text-align: center;
+            }
+            .hero-v2__eyebrow {
+                align-self: center;
+            }
+            .hero-v2__chips {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 720px) {
+            header.hero { text-align: center; }
+            .hero-v2__layout { flex-direction: column; text-align: center; }
+            .hero-v2__copy {
+                max-width: none;
+                align-items: center;
+                text-align: center;
+                margin-left: auto;
+                margin-right: auto;
+                order: 1;
+            }
+            .hero-v2__eyebrow { align-self: center; margin-left: auto; margin-right: auto; }
+            .hero-v2__subtitle,
+            .hero-v2__lead { margin-left: auto; margin-right: auto; }
+            .hero-v2__chips { justify-content: center; }
+            .hero-v2__visual {
+                width: min(260px, 82vw);
+                height: min(290px, 88vw);
+                margin-left: auto;
+                margin-right: auto;
+                order: 2;
             }
         }
 
@@ -694,7 +1052,29 @@
         .download-block .download-sub {
             font-size: 0.8125rem;
             color: var(--text-muted);
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+        }
+
+        .download-block .download-hint {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border-radius: var(--radius-xs);
+            font-size: 0.78rem;
+            line-height: 1.55;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .download-block .download-hint kbd {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-family: inherit;
+            font-weight: 700;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
         }
 
         .download-block a {
@@ -847,8 +1227,30 @@
         .tempo-atencao { color: #f0d060; }
         .tempo-critico { color: #ff8a7a; }
 
-        #monitor-status {
+        .monitor-now-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px 12px;
             margin-top: 16px;
+        }
+
+        .monitor-now-title {
+            font-size: 0.6875rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--info);
+        }
+
+        .monitor-now-refresh {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        #monitor-status {
+            margin-top: 8px;
             padding: 14px 16px;
             font-size: 0.9rem;
             color: var(--text-secondary);
@@ -874,6 +1276,28 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .monitor-standby-hint {
+            margin: 16px 0 0;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            font-size: 0.78rem;
+            line-height: 1.55;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .monitor-standby-hint kbd {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-family: inherit;
+            font-weight: 700;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-strong);
+            color: var(--text-secondary);
         }
 
         .dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -1283,12 +1707,155 @@
 <body>
     <div class="shell">
         <header class="hero">
-            <div class="hero-art-wrap">
-                <img
-                    class="hero-art"
-                    src="{{ url_for('static', filename='img/hero-central-uau.png') }}"
-                    alt="Central UAU - Gestão Financeira e Imobiliária"
-                />
+            <div class="hero-v2" aria-labelledby="hero-title">
+                <div class="hero-v2__mesh" aria-hidden="true"></div>
+                <div class="hero-v2__grid" aria-hidden="true"></div>
+                <div class="hero-v2__layout">
+                    <div class="hero-v2__copy">
+                        <p class="hero-v2__eyebrow">
+                            <span class="hero-v2__pulse" aria-hidden="true"></span>
+                            Motor homologado a lote
+                        </p>
+                        <h1 id="hero-title" class="hero-v2__title">
+                            <span class="hero-v2__title-prefix">Central</span>
+                            <span class="hero-v2__title-gradient">UAU</span>
+                        </h1>
+                        <p class="hero-v2__subtitle">
+                            Gestão financeira e imobiliária — relatórios UAU, consolidados em Excel e operação pronta para escala.
+                        </p>
+                        <p class="hero-v2__lead">
+                            <strong>Centralize os relatórios do UAU</strong> e gere consolidados gerenciais em Excel,
+                            com suporte a processamento <strong>individual</strong> e <strong>em lote</strong>.
+                        </p>
+                        <ul class="hero-v2__chips" aria-label="Destaques">
+                            <li>Excel gerencial</li>
+                            <li>Lote homologado</li>
+                            <li>Fluxo individual</li>
+                        </ul>
+                    </div>
+                    <div class="hero-v2__visual" aria-hidden="true">
+                        <div class="hero-v2__logo-glow"></div>
+                        <div class="hero-v2__logo">
+                            <svg
+                                class="hero-v2__logo-svg"
+                                viewBox="0 0 160 180"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <defs>
+                                    <linearGradient id="heroLogoLine" x1="4" y1="168" x2="152" y2="16" gradientUnits="userSpaceOnUse">
+                                        <stop offset="0" stop-color="#4d8eff">
+                                            <animate attributeName="stop-color" values="#4d8eff;#6eb0ff;#8899ff;#4d8eff" dur="4.2s" repeatCount="indefinite" />
+                                        </stop>
+                                        <stop offset="0.45" stop-color="#d4243e">
+                                            <animate attributeName="stop-color" values="#d4243e;#ff6b7d;#ff8a9b;#d4243e" dur="3.6s" repeatCount="indefinite" />
+                                        </stop>
+                                        <stop offset="1" stop-color="#ff8a9b">
+                                            <animate attributeName="stop-color" values="#ff8a9b;#d4243e;#4d8eff;#ff8a9b" dur="5s" repeatCount="indefinite" />
+                                        </stop>
+                                        <animateTransform attributeName="gradientTransform" type="rotate" from="0 80 92" to="360 80 92" dur="16s" repeatCount="indefinite" />
+                                    </linearGradient>
+                                    <linearGradient id="heroLogoFace" x1="80" y1="24" x2="80" y2="156" gradientUnits="userSpaceOnUse">
+                                        <stop stop-color="rgba(255,255,255,0.07)" />
+                                        <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
+                                    </linearGradient>
+                                    <filter id="heroLogoSoftGlow" x="-30%" y="-30%" width="160%" height="160%">
+                                        <feGaussianBlur stdDeviation="2.2" result="b" />
+                                        <feMerge>
+                                            <feMergeNode in="b" />
+                                            <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                    </filter>
+                                    <filter id="heroChartWideGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feGaussianBlur stdDeviation="4" result="g" />
+                                        <feMerge>
+                                            <feMergeNode in="g" />
+                                        </feMerge>
+                                    </filter>
+                                </defs>
+                                <g class="hero-logo-float">
+                                    <rect
+                                        class="hero-logo-frame"
+                                        x="14"
+                                        y="22"
+                                        width="132"
+                                        height="136"
+                                        rx="28"
+                                        fill="url(#heroLogoFace)"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-opacity="0.55"
+                                        stroke-width="1.15"
+                                    />
+                                    <!-- Torres + telhado (imobiliário) -->
+                                    <rect
+                                        x="28"
+                                        y="118"
+                                        width="18"
+                                        height="28"
+                                        rx="3"
+                                        fill="rgba(255,255,255,0.05)"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="1.05"
+                                    />
+                                    <path
+                                        d="M52 96L69 80 86 96V146H52V96Z"
+                                        fill="rgba(255,255,255,0.05)"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="1.05"
+                                        stroke-linejoin="round"
+                                    />
+                                    <path
+                                        d="M52 96L69 80 86 96"
+                                        fill="none"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="1.2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+                                    <rect
+                                        x="94"
+                                        y="112"
+                                        width="18"
+                                        height="34"
+                                        rx="3"
+                                        fill="rgba(255,255,255,0.05)"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="1.05"
+                                    />
+                                    <path
+                                        d="M58 110h10M58 124h10M72 110h10M72 124h10"
+                                        stroke="rgba(255,255,255,0.14)"
+                                        stroke-width="1.2"
+                                        stroke-linecap="round"
+                                    />
+                                    <!-- Curva de performance: halo + traço animado -->
+                                    <path
+                                        class="hero-logo-chart-glow"
+                                        d="M22 132c12-4 18-22 28-24s16 10 24 4 14-24 24-28 18 2 26-8 18-14 28-22"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="5.5"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        filter="url(#heroChartWideGlow)"
+                                    />
+                                    <path
+                                        class="hero-logo-chart"
+                                        d="M22 132c12-4 18-22 28-24s16 10 24 4 14-24 24-28 18 2 26-8 18-14 28-22"
+                                        stroke="url(#heroLogoLine)"
+                                        stroke-width="2.85"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        filter="url(#heroLogoSoftGlow)"
+                                    />
+                                    <circle class="hero-logo-node hero-logo-node--1" cx="50" cy="108" r="2.8" fill="url(#heroLogoLine)" />
+                                    <circle class="hero-logo-node hero-logo-node--2" cx="78" cy="104" r="2.8" fill="url(#heroLogoLine)" />
+                                    <circle class="hero-logo-node hero-logo-node--3" cx="106" cy="76" r="2.8" fill="url(#heroLogoLine)" />
+                                    <circle class="hero-logo-node hero-logo-node--4" cx="132" cy="50" r="3" fill="url(#heroLogoLine)" />
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -1324,6 +1891,10 @@
                 <div class="download-block-inner">
                     <div class="download-title">Arquivos prontos para download</div>
                     <div class="download-sub">Saída principal executiva por empreendimento e base opcional em formato SQL-like (somente dados, sem painéis).</div>
+                    <p class="download-hint" role="note">
+                        <strong>Quando está pronto:</strong> este aviso verde e o bloco abaixo aparecem quando o servidor <em>terminou de gerar</em> os Excel.
+                        Ao clicar em baixar, o Edge mostra o progresso na <strong>barra de downloads</strong> (ícone de seta ou <kbd>Ctrl</kbd>+<kbd>J</kbd>); quando o ficheiro deixar de aparecer como “a transferir”, já está na pasta <strong>Transferências</strong> do Windows.
+                    </p>
                     <a href="{{ url_for('baixar_planilha') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                         Baixar CARTEIRAS GERAL
@@ -1514,6 +2085,10 @@
                         <span id="contador-estimado">0:00</span>
                     </div>
                 </div>
+                <div class="monitor-now-header">
+                    <span class="monitor-now-title">Neste momento no servidor</span>
+                    <span class="monitor-now-refresh" title="O painel pergunta ao Flask o estado do lote a cada intervalo">Atualiza ~1,5&nbsp;s</span>
+                </div>
                 <div id="monitor-status">Inicializando validações e leitura dos arquivos…</div>
                 <div id="monitor-modo" class="monitor-meta"></div>
                 <div id="monitor-estimativa" class="monitor-meta">Estimativa de duração: calculada com base no histórico real de execução.</div>
@@ -1547,6 +2122,9 @@
                     <span><span class="dot dot-amarelo"></span> Atenção</span>
                     <span><span class="dot dot-vermelho"></span> Acima do esperado</span>
                 </div>
+                <p class="monitor-standby-hint" role="note">
+                    Se o computador suspender e o navegador mostrar erro de ligação, pressione <kbd>F5</kbd>. O token do lote fica guardado: a página volta a consultar o servidor e o painel de status continua de onde parou (tempo e barra sincronizam com o backend).
+                </p>
             </div>
         </div>
 
@@ -1744,12 +2322,16 @@
             var inicioMs = 0;
             var progressoRealAtivo = false;
             var estimativaAtualSegundos = 0;
+            var estimativaTotalSegundos = 0;
             var HIST_KEY = "uau_exec_history_v1";
             var HIST_EMP_KEY = "uau_exec_history_emp_v1";
             var ACTIVE_TOKEN_KEY = "uau_active_process_token_v1";
+            var PROCESS_START_MS_KEY = "uau_process_start_ms_v1";
             var NOTIF_TOKEN_PREFIX = "uau_notif_done_";
             var titleOriginal = document.title;
             var titleBlinkId = null;
+            var lastHiddenAt = null;
+            var wakeLockSentinel = null;
             var lastExecSeconds = runtimeMeta ? Number(runtimeMeta.dataset.lastExecSeconds || 0) : 0;
             var lastExecFiles = runtimeMeta ? Number(runtimeMeta.dataset.lastExecFiles || 0) : 0;
             var lastExecSuccess = runtimeMeta ? Number(runtimeMeta.dataset.lastExecSuccess || 0) : 0;
@@ -1901,11 +2483,121 @@
                 } catch (_e) {}
             }
 
-            document.addEventListener("visibilitychange", function () {
-                if (!document.hidden) {
-                    pararBlinkTitulo();
+            function solicitarWakeLockTela() {
+                try {
+                    if (!("wakeLock" in navigator) || !navigator.wakeLock || typeof navigator.wakeLock.request !== "function") {
+                        return Promise.resolve();
+                    }
+                    return navigator.wakeLock.request("screen").then(function (sent) {
+                        wakeLockSentinel = sent;
+                        if (sent && sent.addEventListener) {
+                            sent.addEventListener("release", function () {
+                                wakeLockSentinel = null;
+                            });
+                        }
+                    }).catch(function () {});
+                } catch (_e) {
+                    return Promise.resolve();
                 }
-            });
+            }
+
+            function liberarWakeLockTela() {
+                try {
+                    if (wakeLockSentinel && typeof wakeLockSentinel.release === "function") {
+                        wakeLockSentinel.release();
+                    }
+                } catch (_e) {}
+                wakeLockSentinel = null;
+            }
+
+            function segundosFallbackDesdeInicioSessao() {
+                try {
+                    var t0 = Number(sessionStorage.getItem(PROCESS_START_MS_KEY) || 0);
+                    if (!t0 || t0 > Date.now()) return 0;
+                    return Math.min(86400, Math.floor((Date.now() - t0) / 1000));
+                } catch (_e) {
+                    return 0;
+                }
+            }
+
+            function limparEstadoProcessoCliente() {
+                try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                try { sessionStorage.removeItem(PROCESS_START_MS_KEY); } catch (_e) {}
+            }
+
+            function ativarMonitorRetomadaFallback(token, mensagemStatus) {
+                if (!monitor || !token) return;
+                monitor.classList.remove("concluido");
+                monitor.classList.add("ativo");
+                if (statusEl) {
+                    statusEl.textContent = mensagemStatus || "Reconectando ao servidor…";
+                }
+                if (processTokenInput) processTokenInput.value = token;
+                try { localStorage.setItem(ACTIVE_TOKEN_KEY, token); } catch (_e) {}
+                var seg = segundosFallbackDesdeInicioSessao();
+                iniciarContador(seg);
+                progressoRealAtivo = false;
+                iniciarPollingProgresso(token);
+                solicitarWakeLockTela();
+                if (botao) {
+                    botao.disabled = true;
+                    botao.textContent = "Processando…";
+                }
+            }
+
+            function garantirPollingAposRetorno() {
+                var tokenAtivo = "";
+                try { tokenAtivo = String(localStorage.getItem(ACTIVE_TOKEN_KEY) || "").trim(); } catch (_e) {}
+                if (!tokenAtivo) return;
+                iniciarPollingProgresso(tokenAtivo);
+                solicitarWakeLockTela();
+                var url = "/progresso-lote/" + encodeURIComponent(tokenAtivo);
+                fetch(url, { cache: "no-store" })
+                    .then(function (r) {
+                        if (r.status === 404) {
+                            limparEstadoProcessoCliente();
+                            liberarWakeLockTela();
+                            throw new Error("status_404");
+                        }
+                        if (!r.ok) throw new Error("status_" + r.status);
+                        return r.json();
+                    })
+                    .then(function (data) {
+                        if (data && data.ok === true) {
+                            aplicarProgressoReal(data);
+                        }
+                    })
+                    .catch(function () {});
+            }
+
+            function ressincronizarAposRetornoInterface() {
+                pararBlinkTitulo();
+                var tokenAtivo = "";
+                try { tokenAtivo = String(localStorage.getItem(ACTIVE_TOKEN_KEY) || "").trim(); } catch (_e) {}
+                var away = lastHiddenAt ? Date.now() - lastHiddenAt : 0;
+                lastHiddenAt = null;
+                if (away < 800) {
+                    if (tokenAtivo) {
+                        solicitarWakeLockTela();
+                    }
+                    return;
+                }
+                if (!tokenAtivo) {
+                    return;
+                }
+                var path = (window.location && window.location.pathname) ? window.location.pathname : "/";
+                fetch(path, { method: "HEAD", cache: "no-store", credentials: "same-origin" })
+                    .then(function (r) {
+                        if (!r || !r.ok) {
+                            window.location.reload();
+                            return;
+                        }
+                        garantirPollingAposRetorno();
+                    })
+                    .catch(function () {
+                        window.location.reload();
+                    });
+            }
 
             if (lastExecSuccess === 1 && lastExecSeconds > 0) {
                 salvarExecucaoHistorico(lastExecSeconds, lastExecFiles);
@@ -2063,6 +2755,11 @@
 
             function aplicarProgressoReal(data) {
                 progressoRealAtivo = true;
+                var tDec = Number(data.tempo_decorrido_segundos || 0);
+                if (tDec > 0) {
+                    inicioMs = Date.now() - Math.floor(tDec) * 1000;
+                    if (contador) contador.textContent = formatarMmSs(Math.floor(tDec));
+                }
                 var total = Math.max(1, Number(data.total_empreendimentos || 1));
                 var concluidos = clamp(Number(data.concluidos || 0), 0, total);
                 var percentualInformado = Number(data.percentual_tempo || 0);
@@ -2106,10 +2803,11 @@
                     registrarTemposPorItem(data.itens_tempo);
                 }
                 if (data.status === "concluido" && pollId) {
+                    liberarWakeLockTela();
                     monitor.classList.add("concluido");
                     clearInterval(pollId);
                     pollId = null;
-                    try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                    limparEstadoProcessoCliente();
                     var tokConcluido = String(data.token || lastProcessToken || "");
                     if (!jaNotificadoToken(tokConcluido)) {
                         notificarConclusao(data.mensagem);
@@ -2117,7 +2815,8 @@
                     }
                 }
                 if (data.status === "erro") {
-                    try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                    liberarWakeLockTela();
+                    limparEstadoProcessoCliente();
                 }
             }
 
@@ -2133,14 +2832,18 @@
                         })
                         .then(function (data) {
                             if (!data || data.ok !== true) return;
-                            if (contadorEstimado && Number(data.estimativa_total_segundos || 0) > 0) {
-                                contadorEstimado.textContent = formatarMmSs(Number(data.estimativa_total_segundos || 0));
+                            if (Number(data.estimativa_total_segundos || 0) > 0) {
+                                estimativaTotalSegundos = Number(data.estimativa_total_segundos || 0);
+                                var segAgora = Math.floor((Date.now() - inicioMs) / 1000);
+                                var restanteAgora = Math.max(0, Math.floor(estimativaTotalSegundos - segAgora));
+                                if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(restanteAgora);
                             }
                             aplicarProgressoReal(data);
                         })
                         .catch(function (err) {
                             if (String((err && err.message) || "").indexOf("status_404") >= 0) {
-                                try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                                liberarWakeLockTela();
+                                limparEstadoProcessoCliente();
                             }
                             /* mantém monitor estimado quando endpoint ainda não respondeu */
                         });
@@ -2149,24 +2852,29 @@
                 pollId = setInterval(consultar, 1500);
             }
 
-            function iniciarContador() {
-                inicioMs = Date.now();
+            function iniciarContador(segundosIniciais) {
+                var baseSeg = Math.max(0, Math.floor(Number(segundosIniciais || 0)));
+                inicioMs = Date.now() - baseSeg * 1000;
                 progressoRealAtivo = false;
                 monitor.classList.remove("concluido");
                 monitor.classList.add("ativo");
-                atualizarFaixa(0);
-                contador.textContent = formatarMmSs(0);
+                atualizarFaixa(baseSeg);
+                contador.textContent = formatarMmSs(baseSeg);
                 if (monitorModo) monitorModo.textContent = textoModoMonitor();
                 var totais = calcularTotaisMonitor();
                 var est = textoEstimativa(totais.receber, totais.recebidos, totais.estoque);
                 estimativaAtualSegundos = Number(est.segundos || 0);
+                estimativaTotalSegundos = estimativaAtualSegundos;
                 if (monitorEstimativa) monitorEstimativa.textContent = "";
-                if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(estimativaAtualSegundos || 0);
-                atualizarResumoProgresso(0, totais.totalEmpreendimentos);
+                if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(estimativaTotalSegundos || 0);
+                atualizarResumoProgresso(baseSeg, totais.totalEmpreendimentos);
                 if (timerId) clearInterval(timerId);
                 timerId = setInterval(function () {
                     var seg = Math.floor((Date.now() - inicioMs) / 1000);
                     contador.textContent = formatarMmSs(seg);
+                    var baseRestante = estimativaTotalSegundos > 0 ? estimativaTotalSegundos : estimativaAtualSegundos;
+                    var restante = Math.max(0, Math.floor(baseRestante - seg));
+                    if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(restante);
                     atualizarFaixa(seg);
                     if (!progressoRealAtivo) {
                         atualizarResumoProgresso(seg, totais.totalEmpreendimentos);
@@ -2184,29 +2892,83 @@
                 var url = "/progresso-lote/" + encodeURIComponent(tokenRetomada);
                 fetch(url, { cache: "no-store" })
                     .then(function (r) {
+                        if (r.status === 404) {
+                            limparEstadoProcessoCliente();
+                            liberarWakeLockTela();
+                            throw new Error("status_404");
+                        }
                         if (!r.ok) throw new Error("status_" + r.status);
                         return r.json();
                     })
                     .then(function (data) {
                         if (!data || data.ok !== true) return;
                         if (data.status === "concluido" || data.status === "erro") {
-                            try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                            limparEstadoProcessoCliente();
                             return;
                         }
                         if (processTokenInput && !processTokenInput.value) {
                             processTokenInput.value = String(data.token || tokenRetomada);
                         }
                         try { localStorage.setItem(ACTIVE_TOKEN_KEY, String(data.token || tokenRetomada)); } catch (_e) {}
-                        iniciarContador();
+                        var segSrv = Math.max(0, Math.floor(Number(data.tempo_decorrido_segundos || 0)));
+                        var segIni = segSrv > 0 ? segSrv : segundosFallbackDesdeInicioSessao();
+                        iniciarContador(segIni);
                         aplicarProgressoReal(data);
                         iniciarPollingProgresso(String(data.token || tokenRetomada));
+                        solicitarWakeLockTela();
+                        if (botao) {
+                            botao.disabled = true;
+                            botao.textContent = "Processando…";
+                        }
                     })
-                    .catch(function () {
-                        try { localStorage.removeItem(ACTIVE_TOKEN_KEY); } catch (_e) {}
+                    .catch(function (err) {
+                        if (String((err && err.message) || "").indexOf("status_404") >= 0) {
+                            return;
+                        }
+                        ativarMonitorRetomadaFallback(
+                            tokenRetomada,
+                            "Reconectando ao servidor… O processamento pode continuar em segundo plano. Se a barra não atualizar, use F5."
+                        );
                     });
             }
 
             retomarMonitorSeNecessario();
+
+            /* Segunda tentativa após F5 / retorno da suspensão (rede ainda a acordar). */
+            setTimeout(function () {
+                try {
+                    var t = String(localStorage.getItem(ACTIVE_TOKEN_KEY) || "").trim();
+                    if (!t || !monitor || monitor.classList.contains("ativo")) return;
+                    retomarMonitorSeNecessario();
+                } catch (_e) {}
+            }, 2800);
+
+            document.addEventListener("visibilitychange", function () {
+                if (document.hidden) {
+                    lastHiddenAt = Date.now();
+                    return;
+                }
+                ressincronizarAposRetornoInterface();
+            });
+
+            window.addEventListener("pageshow", function (ev) {
+                if (ev.persisted) {
+                    lastHiddenAt = Date.now() - 60000;
+                    ressincronizarAposRetornoInterface();
+                }
+            });
+
+            window.addEventListener("online", function () {
+                try {
+                    if (String(localStorage.getItem(ACTIVE_TOKEN_KEY) || "").trim()) {
+                        garantirPollingAposRetorno();
+                    }
+                } catch (_e) {}
+            });
+
+            window.addEventListener("beforeunload", function () {
+                liberarWakeLockTela();
+            });
 
             form.addEventListener("submit", function (ev) {
                 var submitter = ev.submitter;
@@ -2222,8 +2984,10 @@
                 var token = gerarTokenProcesso();
                 if (processTokenInput) processTokenInput.value = token;
                 try { localStorage.setItem(ACTIVE_TOKEN_KEY, token); } catch (_e) {}
-                iniciarContador();
+                try { sessionStorage.setItem(PROCESS_START_MS_KEY, String(Date.now())); } catch (_e) {}
+                iniciarContador(0);
                 iniciarPollingProgresso(token);
+                solicitarWakeLockTela();
                 if (botao) {
                     botao.disabled = true;
                     botao.textContent = "Processando…";

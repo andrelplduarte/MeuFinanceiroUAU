@@ -624,9 +624,36 @@ def normalizar_emp_obra(txt):
     txt = txt.replace("SCPG O", "SCPGO")
     txt = txt.replace("SCPG0", "SCPGO")
     txt = txt.replace("51/BVGW", "51/BVGWH")
+    txt = txt.replace("/BVGW", "/BVGWH")
+    # Bella White: colapsa 51/BVGWH, 51/BVGWHHH, 51/BVGWHHHH etc. → 51/BVGWH (exibição/chave única).
+    m_bb = re.match(r"^(\d+/)BVGWH+$", txt)
+    if m_bb:
+        txt = f"{m_bb.group(1)}BVGWH"
+    # Segurança extra: qualquer variação com sufixo BVGW(H...) vira canônico 51/BVGWH.
+    if re.search(r"(^|/)BVGW(H+)?$", txt):
+        txt = "51/BVGWH"
     if txt == "27/SCPG":
         txt = "27/SCPGO"
     return txt
+
+
+def empreendimento_oficial_para_emp_obra(emp_obra: str) -> str:
+    """Nome de exibição oficial a partir de Emp/Obra normalizado (mapa homologado por sigla)."""
+    eo = normalizar_emp_obra(emp_obra)
+    if not eo or "/" not in eo:
+        return ""
+    sigla = eo.split("/")[-1].strip()
+    return str(MAPA_EMPREENDIMENTO_OFICIAL_POR_SIGLA.get(sigla, "") or "").strip()
+
+
+def _aplicar_nome_oficial_em_series(emp_obra_series: pd.Series, empreendimento_series: pd.Series) -> pd.Series:
+    """Padroniza nome de empreendimento pela sigla oficial quando conhecida."""
+    eo_norm = emp_obra_series.fillna("").astype(str).apply(normalizar_emp_obra)
+    emp_cur = empreendimento_series.fillna("").astype(str).apply(limpar_nome_empreendimento).astype(str).str.strip()
+    emp_of = eo_norm.map(empreendimento_oficial_para_emp_obra).fillna("").astype(str).str.strip()
+    m_of = emp_of.ne("")
+    emp_cur.loc[m_of] = emp_of.loc[m_of]
+    return emp_cur
 
 
 def normalizar_identificador(texto):
@@ -3100,7 +3127,7 @@ def montar_dataframe_resumo_geral(df_consolidado: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     d = df_consolidado.loc[:, list(need)].copy()
-    d["Emp/Obra"] = d["Emp/Obra"].fillna("").astype(str).str.strip()
+    d["Emp/Obra"] = d["Emp/Obra"].fillna("").astype(str).str.strip().apply(normalizar_emp_obra)
     d["Empreendimento"] = (
         d["Empreendimento"]
         .fillna("")
@@ -3121,6 +3148,14 @@ def montar_dataframe_resumo_geral(df_consolidado: pd.DataFrame) -> pd.DataFrame:
         d.loc[vazio, "Empreendimento"] = (
             d.loc[vazio, "Emp/Obra"].map(mapa_emp_por_obra).fillna("").astype(str).str.strip()
         )
+    # Mapa oficial (sigla) quando ainda não há nome legal no consolidado.
+    vazio_of = d["Empreendimento"].str.len() == 0
+    if bool(vazio_of.any()):
+        nomes_of = d.loc[vazio_of, "Emp/Obra"].map(empreendimento_oficial_para_emp_obra)
+        ok_of = nomes_of.fillna("").astype(str).str.strip().ne("")
+        d.loc[vazio_of & ok_of, "Empreendimento"] = nomes_of.loc[vazio_of & ok_of].astype(str).str.strip()
+    # Padronização final por mapa oficial (sigla conhecida sempre prevalece na exibição).
+    d["Empreendimento"] = _aplicar_nome_oficial_em_series(d["Emp/Obra"], d["Empreendimento"])
     # Apresentação executiva do resumo: evita rótulo vazio remanescente.
     d.loc[d["Empreendimento"].str.len() == 0, "Empreendimento"] = "NÃO INFORMADO"
 
@@ -4442,6 +4477,8 @@ def montar_consolidado(
         f"Encargos={float(_serie_num(consolidado,'Vl.Principal (Encargos)').sum()):.2f}"
     )
 
+    consolidado["Emp/Obra"] = consolidado["Emp/Obra"].fillna("").astype(str).apply(normalizar_emp_obra)
+
     consolidado["Empreendimento"] = (
         consolidado["Descricao_Produto"].fillna("").astype(str).apply(limpar_nome_empreendimento)
     )
@@ -4473,6 +4510,17 @@ def montar_consolidado(
         m_fill = emp_txt.astype(str).str.strip().eq("") & emp_fill.notna() & emp_fill.astype(str).str.strip().ne("")
         if bool(m_fill.any()):
             consolidado.loc[m_fill, "Empreendimento"] = emp_fill.loc[m_fill].astype(str).str.strip()
+
+    _emp_of_serie = consolidado["Emp/Obra"].map(empreendimento_oficial_para_emp_obra)
+    _m_emp_vazio = consolidado["Empreendimento"].fillna("").astype(str).str.strip().eq("")
+    _m_of_ok = _emp_of_serie.fillna("").astype(str).str.strip().ne("")
+    consolidado.loc[_m_emp_vazio & _m_of_ok, "Empreendimento"] = _emp_of_serie.loc[
+        _m_emp_vazio & _m_of_ok
+    ].astype(str).str.strip()
+    # Padronização final: siglas oficiais devem exibir sempre o nome oficial.
+    consolidado["Empreendimento"] = _aplicar_nome_oficial_em_series(
+        consolidado["Emp/Obra"], consolidado["Empreendimento"]
+    )
 
     consolidado["Status Construção"] = ""
     consolidado["Identificador"] = consolidado["Identificador"].fillna("").astype(str).str.strip()
@@ -4998,12 +5046,89 @@ def montar_consolidado(
 # =========================
 # ESTILO
 # =========================
+def _desfazer_merges_faixa_linhas(ws, linha_min: int, linha_max: int) -> None:
+    """Remove merges que interceptam [linha_min, linha_max] (reaplicar blocos/cabeçalho sem conflito)."""
+    for mcr in list(ws.merged_cells.ranges):
+        if mcr.max_row < linha_min or mcr.min_row > linha_max:
+            continue
+        try:
+            ws.unmerge_cells(str(mcr))
+        except Exception:
+            pass
+
+
+def _autoajustar_colunas_e_linhas(
+    ws,
+    header_row: int = 8,
+    data_start_row: int = 9,
+    fixed_widths: dict | None = None,
+    limite_coluna: int | None = None,
+) -> None:
+    """
+    Autoajuste de colunas/linhas por conteúdo, preservando larguras fixas informadas.
+    Mantém cabeçalhos/merges estruturais e evita explosão de largura.
+    """
+    fixed = {str(k).upper(): float(v) for k, v in (fixed_widths or {}).items()}
+    max_col = int(limite_coluna or ws.max_column or 1)
+    max_row = int(ws.max_row or data_start_row)
+    scan_until = min(max_row, 4000)
+    for col in range(1, max_col + 1):
+        letter = get_column_letter(col)
+        if letter in fixed:
+            ws.column_dimensions[letter].width = fixed[letter]
+            continue
+        best = 0
+        for row in range(header_row, scan_until + 1):
+            v = ws.cell(row=row, column=col).value
+            if v is None:
+                continue
+            txt = str(v)
+            if not txt.strip():
+                continue
+            best = max(best, len(txt))
+        if best <= 0:
+            continue
+        width = min(max(best + 2, 8), 42)
+        cur = ws.column_dimensions[letter].width
+        if cur is None:
+            ws.column_dimensions[letter].width = width
+        else:
+            ws.column_dimensions[letter].width = max(float(cur), float(width))
+    # Altura de linhas apenas para dados longos (mantém cabeçalho estável).
+    for row in range(data_start_row, scan_until + 1):
+        longest = 0
+        for col in range(1, max_col + 1):
+            v = ws.cell(row=row, column=col).value
+            if v is None:
+                continue
+            longest = max(longest, len(str(v)))
+        if longest > 70:
+            ws.row_dimensions[row].height = 30
+        elif longest > 45:
+            ws.row_dimensions[row].height = 22
+        elif ws.row_dimensions[row].height is None:
+            ws.row_dimensions[row].height = 15
+
+
+def _nome_oficial_para_titulo_aba(ws, fallback: str) -> str:
+    """Resolve nome oficial para título da aba usando primeira linha de dados (A9/B9)."""
+    eo_a9 = normalizar_emp_obra(ws["A9"].value)
+    of = empreendimento_oficial_para_emp_obra(eo_a9)
+    if of:
+        return of
+    b9 = str(ws["B9"].value or "").strip().upper()
+    if b9:
+        return b9
+    return str(fallback or "").strip().upper()
+
+
 def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     """Mesma linguagem visual do Consolidado: painel (1–6), blocos (7), cabeçalho (8), dados (9+)."""
     if NOME_ABA_RESUMO_GERAL not in wb.sheetnames:
         return
     ws = wb[NOME_ABA_RESUMO_GERAL]
-    azul_escuro = "1F4E78"
+    _desfazer_merges_faixa_linhas(ws, 7, 8)
+    azul_escuro = "10243F"
     verde = "92D050"
     vermelho = "F8696B"
     azul_claro = "00B0F0"
@@ -5016,29 +5141,40 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     borda_fina_cinza = Side(style="thin", color="BFBFBF")
 
     ws["A1"] = "RESUMO GERAL"
-    ws["B1"] = str(nome_empreendimento or "").strip().upper()
+    ws["B1"] = "CART.GERAL"
+    try:
+        ws.unmerge_cells("C1:L6")
+    except Exception:
+        pass
+    ws.merge_cells("C1:L6")
+    ws["C1"] = "RESUMO GERAL"
+    ws["C1"].font = Font(bold=False, color=branco, size=46)
+    ws["C1"].fill = PatternFill("solid", fgColor=azul_escuro)
+    ws["C1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws["M1"] = "PAINEL ESTOQUE"
+    ws["M2"] = "QTD.UNID.TOTAL"
+    ws["M3"] = "QTD.UNID.INADIMPLENTES"
+    ws["M4"] = "QTD.UNID.QUITADAS"
+    ws["M5"] = "QTD.UNID.VENDIDAS"
+    ws["M6"] = "QTD.UNID.DISPONIVEL"
     ws["A2"] = "DATA-BASE"
     ws["B2"] = data_base.strftime("%d/%m/%Y") if data_base else ""
-    ws["A3"] = "QTD. VENDAS (TOTAL VISÍVEL)"
+    # Rótulos alinhados ao modelo visual (fórmulas / referências de coluna inalteradas).
+    ws["A3"] = "QTD. VENDAS"
     ws["B3"] = "=SUBTOTAL(109,C9:C1048576)"
-    if str(CARTEIRA_MODO_OFICIAL).strip().upper() == "POSICAO_TOTAL":
-        ws["A4"] = "VL.CARTEIRA (POSIÇÃO TOTAL)"
-    else:
-        ws["A4"] = "VL.CARTEIRA (SALDO EM ABERTO)"
+    ws["A4"] = "VL.CARTEIRA CART.TOTAL"
     ws["B4"] = "=SUBTOTAL(109,J9:J1048576)"
-    ws["A5"] = "VL.TOTAL INADIMPLÊNCIA"
+    ws["A5"] = "VL.INADIMPLÊNCIA CART.TOTAL"
     ws["B5"] = "=SUBTOTAL(109,G9:G1048576)"
-    if str(CARTEIRA_MODO_OFICIAL).strip().upper() == "POSICAO_TOTAL":
-        ws["A6"] = "% INADIMPLÊNCIA / CARTEIRA TOTAL"
-    else:
-        ws["A6"] = "% INADIMPLÊNCIA / SALDO ABERTO"
+    ws["A6"] = "% INADIMPLÊNCIA CART.TOTAL"
     ws["B6"] = "=IFERROR(B5/B4,0)"
-    ws.row_dimensions[1].height = 24
-    ws.row_dimensions[7].height = 22
-    ws.row_dimensions[8].height = 24
+    for r in range(1, 7):
+        ws.row_dimensions[r].height = 18
+    ws.row_dimensions[7].height = 14.4
+    ws.row_dimensions[8].height = 14.4
 
     for linha in range(1, 7):
-        ws[f"A{linha}"].font = Font(bold=True, color=branco)
+        ws[f"A{linha}"].font = Font(name="Calibri", size=10, bold=True, color=branco)
         ws[f"A{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
         ws[f"A{linha}"].alignment = Alignment(horizontal="left", vertical="center")
         ws[f"A{linha}"].border = Border(
@@ -5047,13 +5183,39 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
             top=borda_media_preta if linha == 1 else borda_fina_branca,
             bottom=borda_fina_branca,
         )
-        ws[f"B{linha}"].font = Font(bold=True, color=preto)
+        ws[f"B{linha}"].font = Font(name="Calibri", size=10, bold=True, color=preto)
         ws[f"B{linha}"].alignment = Alignment(horizontal="center", vertical="center")
         ws[f"B{linha}"].border = Border(
             left=borda_fina_branca,
             right=borda_media_preta,
             top=borda_media_preta if linha == 1 else borda_fina_branca,
             bottom=borda_fina_branca,
+        )
+        ws[f"M{linha}"].font = Font(name="Calibri", size=10, bold=True, color=branco)
+        ws[f"M{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
+        ws[f"M{linha}"].alignment = Alignment(horizontal="left", vertical="center")
+        ws[f"M{linha}"].border = Border(
+            left=borda_media_preta,
+            right=borda_fina_branca,
+            top=borda_media_preta if linha == 1 else borda_fina_branca,
+            bottom=borda_fina_branca,
+        )
+
+    # M1:M6 e N1:N6: contorno branco #FFFFFF + divisórias horizontais (painel estoque, anexo 5).
+    _bd_ext_branco = Side(style="thin", color="FFFFFF")
+    for r in range(1, 7):
+        ws[f"M{r}"].border = Border(
+            left=_bd_ext_branco,
+            right=_bd_ext_branco,
+            top=_bd_ext_branco if r == 1 else Side(style=None),
+            bottom=_bd_ext_branco,
+        )
+        ws[f"N{r}"].fill = PatternFill("solid", fgColor=branco)
+        ws[f"N{r}"].border = Border(
+            left=_bd_ext_branco,
+            right=_bd_ext_branco,
+            top=_bd_ext_branco if r == 1 else Side(style=None),
+            bottom=_bd_ext_branco,
         )
 
     ws["B4"].number_format = "R$ #,##0.00"
@@ -5073,7 +5235,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
         celula = ws[faixa.split(":")[0]]
         celula.value = titulo
         celula.fill = PatternFill("solid", fgColor=cor)
-        celula.font = Font(bold=True, color=cor_fonte)
+        celula.font = Font(name="Calibri", size=10, bold=True, color=cor_fonte)
         celula.alignment = Alignment(horizontal="center", vertical="center")
         for row in ws[faixa]:
             for c in row:
@@ -5084,16 +5246,28 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                     bottom=borda_fina_branca,
                 )
 
-    for cell in ws[8]:
-        cell.font = Font(bold=True, color=branco)
-        cell.fill = PatternFill("solid", fgColor=azul_escuro)
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = Border(
-            left=borda_fina_branca,
-            right=borda_fina_branca,
-            top=borda_fina_branca,
-            bottom=borda_media_preta,
-        )
+    hdr_seg_rg = [
+        ("A", "C", azul_escuro, branco),
+        ("D", "E", verde, branco),
+        ("F", "G", vermelho, branco),
+        ("H", "I", azul_claro, branco),
+        ("J", "M", amarelo, preto),
+        ("N", "N", azul_escuro, branco),
+    ]
+    for c0, c1, fg, fc in hdr_seg_rg:
+        for ci in range(column_index_from_string(c0), column_index_from_string(c1) + 1):
+            cell = ws.cell(row=8, column=ci)
+            if cell.value is not None:
+                cell.value = _padronizar_rotulo_coluna_exibicao(str(cell.value))
+            cell.font = Font(name="Calibri", size=10, bold=True, color=fc)
+            cell.fill = PatternFill("solid", fgColor=fg)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = Border(
+                left=borda_fina_branca,
+                right=borda_fina_branca,
+                top=borda_fina_branca,
+                bottom=borda_media_preta,
+            )
 
     max_row_data = ws.max_row or 9
     max_col_data = ws.max_column or 14
@@ -5133,30 +5307,31 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                 bottom=cell.border.bottom,
             )
 
+    # Larguras do modelo de referência (Downloads\CARTEIRAS GERAL.xlsx), aba RESUMO GERAL.
     larguras_rg = {
-        "A": 14,
-        "B": 32,
-        "C": 14,
-        "D": 16,
-        "E": 16,
-        "F": 22,
-        "G": 22,
-        "H": 18,
-        "I": 18,
-        "J": 18,
-        "K": 12,
-        "L": 16,
-        "M": 14,
-        "N": 16,
+        "A": 29.0,
+        "B": 23.0,
+        "C": 15.77734375,
+        "D": 14.6640625,
+        "E": 17.6640625,
+        "F": 14.109375,
+        "G": 15.5546875,
+        "H": 14.109375,
+        "I": 16.5546875,
+        "J": 17.6640625,
+        "K": 11.88671875,
+        "L": 20.21875,
+        "M": 23.0,
+        "N": 18.0,
     }
     for col, largura in larguras_rg.items():
         ws.column_dimensions[col].width = largura
 
+    _autoajustar_colunas_e_linhas(ws, header_row=8, data_start_row=9, fixed_widths={})
     ws.freeze_panes = "A9"
-    ws.auto_filter.ref = None
+    ws.auto_filter.ref = "A8:N8"
 
-    for col in ["A", "B"]:
-        ws[f"{col}6"].fill = PatternFill("solid", fgColor="D9E1F2")
+    # Mantém A6/B6 no mesmo padrão visual das linhas do painel (sem faixa cinza isolada).
 
 
 def aplicar_estilo_arquivo_so_aba_resumo_geral(caminho_xlsx, data_base, nome_empreendimento):
@@ -5220,7 +5395,7 @@ def _aplicar_estilo_aba_consolidado_estoque(wb, data_base, nome_empreendimento, 
     hdr_row = CONSOLIDADO_ESTOQUE_PANDAS_STARTROW + 1
     d0 = CONSOLIDADO_ESTOQUE_PANDAS_STARTROW + 2
 
-    azul_escuro = "1F4E78"
+    azul_escuro = "10243F"
     branco = "FFFFFF"
     preto = "000000"
     azul_claro_panel = "D9E1F2"
@@ -5533,7 +5708,7 @@ def aplicar_estilo_excel(
 
     wb = load_workbook(caminho_saida)
 
-    azul_escuro = "1F4E78"
+    azul_escuro = "10243F"
     verde = "92D050"
     vermelho = "F8696B"
     azul_claro = "00B0F0"
@@ -5546,12 +5721,31 @@ def aplicar_estilo_excel(
     borda_media_preta = Side(style="medium", color="000000")
     borda_fina_cinza = Side(style="thin", color="BFBFBF")
 
+    aux_alignment_centro = Alignment(horizontal="center", vertical="center")
+    aux_border_cinza = Border(
+        left=borda_fina_cinza,
+        right=borda_fina_cinza,
+        top=borda_fina_cinza,
+        bottom=borda_fina_cinza,
+    )
+
     if not apenas_abas_apoio:
         ws = wb[nome_aba_principal]
+        _desfazer_merges_faixa_linhas(ws, 7, 8)
         _notify("Consolidado: painel, blocos e cabeçalho")
 
+        nome_oficial_titulo = _nome_oficial_para_titulo_aba(ws, nome_empreendimento)
         ws["A1"] = "EMPREENDIMENTO"
-        ws["B1"] = str(nome_empreendimento or "").strip().upper()
+        ws["B1"] = nome_oficial_titulo
+        try:
+            ws.unmerge_cells("C1:U6")
+        except Exception:
+            pass
+        ws.merge_cells("C1:U6")
+        ws["C1"] = nome_oficial_titulo
+        ws["C1"].font = Font(name="Calibri", bold=True, color=branco, size=46)
+        ws["C1"].fill = PatternFill("solid", fgColor=azul_escuro)
+        ws["C1"].alignment = Alignment(horizontal="center", vertical="center")
         ws["A2"] = "DATA-BASE"
         ws["B2"] = data_base.strftime("%d/%m/%Y") if data_base else ""
         ws["A3"] = "QTD. VENDAS"
@@ -5569,36 +5763,37 @@ def aplicar_estilo_excel(
             ws["A6"] = "% INADIMPLÊNCIA / SALDO ABERTO"
         ws["B6"] = "=IFERROR(B5/B4,0)"
         k_es = _kpis_estoque_por_empreendimento(ws)
-        ws["D1"] = "PAINEL ESTOQUE"
-        ws["D2"] = "QTD.UNID.TOTAL"
-        ws["D3"] = "QTD.UNID.INADIMPLENTES"
-        ws["D4"] = "QTD.UNID.QUITADAS"
-        ws["D5"] = "QTD.UNID.VENDIDAS"
-        ws["D6"] = "QTD.UNID.DISPONIVEL"
+        ws["Z1"] = "PAINEL ESTOQUE"
+        ws["Z2"] = "QTD.UNID.TOTAL"
+        ws["Z3"] = "QTD.UNID.INADIMPLENTES"
+        ws["Z4"] = "QTD.UNID.QUITADAS"
+        ws["Z5"] = "QTD.UNID.VENDIDAS"
+        ws["Z6"] = "QTD.UNID.DISPONIVEL"
         link_drive = _resolver_link_drive_empreendimento(ws)
-        ws["F1"] = "LINK DRIVE"
+        ws["V6"] = "LINK DRIVE"
         if link_drive:
-            ws["G1"] = "ABRIR DOCUMENTOS"
-            ws["G1"].hyperlink = link_drive
+            ws["W6"] = "ABRIR DOCUMENTOS"
+            ws["W6"].hyperlink = link_drive
         else:
-            ws["G1"] = "LINK NÃO CADASTRADO"
+            ws["W6"] = "LINK NÃO CADASTRADO"
+        try:
+            ws.unmerge_cells("W6:Y6")
+        except Exception:
+            pass
+        ws.merge_cells("W6:Y6")
         if k_es:
             tot = max(int(k_es["total"]), 0)
-            ws["C2"] = tot
-            ws["C3"] = int(k_es["inad"])
-            ws["C4"] = int(k_es["quit"])
-            ws["C5"] = int(k_es["vend"])
-            ws["C6"] = int(k_es["disp"])
-            ws["E3"] = f"=IFERROR(C3/C2,0)"
-            ws["E4"] = f"=IFERROR(C4/C2,0)"
-            ws["E5"] = f"=IFERROR(C5/C2,0)"
-            ws["E6"] = f"=IFERROR(C6/C2,0)"
+            ws["AA2"] = tot
+            ws["AA3"] = int(k_es["inad"])
+            ws["AA4"] = int(k_es["quit"])
+            ws["AA5"] = int(k_es["vend"])
+            ws["AA6"] = int(k_es["disp"])
         else:
-            for c in ("C2", "C3", "C4", "C5", "C6", "E3", "E4", "E5", "E6"):
+            for c in ("AA2", "AA3", "AA4", "AA5", "AA6"):
                 ws[c] = ""
 
         for linha in range(1, 7):
-            ws[f"A{linha}"].font = Font(bold=True, color=branco)
+            ws[f"A{linha}"].font = Font(name="Calibri", size=10, bold=True, color=branco)
             ws[f"A{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
             ws[f"A{linha}"].alignment = Alignment(horizontal="left", vertical="center")
             ws[f"A{linha}"].border = Border(
@@ -5607,64 +5802,80 @@ def aplicar_estilo_excel(
                 bottom=borda_fina_branca
             )
 
-            ws[f"B{linha}"].font = Font(bold=True, color=preto)
+            ws[f"B{linha}"].font = Font(name="Calibri", size=10, bold=True, color=preto)
             ws[f"B{linha}"].alignment = Alignment(horizontal="center", vertical="center")
             ws[f"B{linha}"].border = Border(
                 left=borda_fina_branca, right=borda_media_preta,
                 top=borda_media_preta if linha == 1 else borda_fina_branca,
                 bottom=borda_fina_branca
             )
-            ws[f"D{linha}"].font = Font(bold=True, color=branco)
-            ws[f"D{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
-            ws[f"D{linha}"].alignment = Alignment(horizontal="left", vertical="center")
-            ws[f"D{linha}"].border = Border(
+            ws[f"Z{linha}"].font = Font(name="Calibri", size=10, bold=True, color=branco)
+            ws[f"Z{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
+            ws[f"Z{linha}"].alignment = Alignment(horizontal="left", vertical="center")
+            ws[f"Z{linha}"].border = Border(
                 left=borda_media_preta, right=borda_fina_branca,
                 top=borda_media_preta if linha == 1 else borda_fina_branca,
                 bottom=borda_fina_branca
             )
-            ws[f"C{linha}"].font = Font(bold=True, color=preto)
-            ws[f"C{linha}"].alignment = Alignment(horizontal="center", vertical="center")
-            ws[f"C{linha}"].border = Border(
+            ws[f"AA{linha}"].font = Font(name="Calibri", size=10, bold=True, color=preto)
+            ws[f"AA{linha}"].alignment = Alignment(horizontal="center", vertical="center")
+            ws[f"AA{linha}"].border = Border(
                 left=borda_fina_branca, right=borda_fina_branca,
                 top=borda_media_preta if linha == 1 else borda_fina_branca,
                 bottom=borda_fina_branca
             )
-            ws[f"E{linha}"].font = Font(bold=True, color=preto)
-            ws[f"E{linha}"].alignment = Alignment(horizontal="center", vertical="center")
-            ws[f"E{linha}"].border = Border(
-                left=borda_fina_branca, right=borda_media_preta,
-                top=borda_media_preta if linha == 1 else borda_fina_branca,
-                bottom=borda_fina_branca
-            )
-        ws["F1"].font = Font(bold=True, color=branco)
-        ws["F1"].fill = PatternFill("solid", fgColor=azul_escuro)
-        ws["F1"].alignment = Alignment(horizontal="left", vertical="center")
-        ws["F1"].border = Border(
+        ws["V6"].font = Font(name="Calibri", size=10, bold=True, color=branco)
+        ws["V6"].fill = PatternFill("solid", fgColor=azul_escuro)
+        ws["V6"].alignment = Alignment(horizontal="left", vertical="center")
+        ws["V6"].border = Border(
             left=borda_media_preta, right=borda_fina_branca,
             top=borda_media_preta, bottom=borda_fina_branca
         )
-        ws["G1"].font = Font(bold=True, color="FFFFFF" if link_drive else preto, underline="single" if link_drive else None)
-        ws["G1"].fill = PatternFill("solid", fgColor="1D4ED8" if link_drive else "E5E7EB")
-        ws["G1"].alignment = Alignment(horizontal="center", vertical="center")
-        ws["G1"].border = Border(
+        ws["W6"].font = Font(name="Calibri", size=10, bold=True, color="FFFFFF" if link_drive else preto, underline="single" if link_drive else None)
+        ws["W6"].fill = PatternFill("solid", fgColor="1D4ED8" if link_drive else "E5E7EB")
+        ws["W6"].alignment = Alignment(horizontal="center", vertical="center")
+        ws["W6"].border = Border(
             left=borda_fina_branca, right=borda_media_preta,
             top=borda_media_preta, bottom=borda_fina_branca
         )
+        # Faixa V1:Y5: bloco azul contínuo, sem linhas internas (como anexo 2).
+        for rr in range(1, 6):
+            for cc in ("V", "W", "X", "Y"):
+                c = ws[f"{cc}{rr}"]
+                c.fill = PatternFill("solid", fgColor=azul_escuro)
+                c.border = Border()
+
+        # Z1:Z6 e AA1:AA6: bordas brancas iguais ao painel M/N do resumo (contorno + divisórias horizontais).
+        _bd_w_panel = Side(style="thin", color="FFFFFF")
+        for rr in range(1, 7):
+            ws[f"Z{rr}"].border = Border(
+                left=borda_media_preta,
+                right=_bd_w_panel,
+                top=borda_media_preta if rr == 1 else _bd_w_panel,
+                bottom=_bd_w_panel,
+            )
+            ws[f"AA{rr}"].fill = PatternFill("solid", fgColor=branco)
+            ws[f"AA{rr}"].border = Border(
+                left=_bd_w_panel,
+                right=_bd_w_panel,
+                top=_bd_w_panel if rr == 1 else Side(style=None),
+                bottom=_bd_w_panel,
+            )
 
         ws["B4"].number_format = 'R$ #,##0.00'
         ws["B5"].number_format = 'R$ #,##0.00'
         ws["B6"].number_format = '0.00%'
-        for c in ("C2", "C3", "C4", "C5", "C6"):
+        for c in ("AA2", "AA3", "AA4", "AA5", "AA6"):
             ws[c].number_format = "0"
-        for c in ("E3", "E4", "E5", "E6"):
-            ws[c].number_format = "0.00%"
 
+        # Blocos linha 7 conforme modelo (A:AA): mesmas cores; colunas de dados abaixo permanecem as do motor.
         blocos = [
-            ("A7:E7", "DADOS CADASTRO", azul_escuro, branco),
-            ("F7:J7", "PAGO", verde, branco),
-            ("K7:Q7", "INADIMPLÊNCIA", vermelho, branco),
-            ("R7:S7", "A VENCER", azul_claro, branco),
-            ("T7:X7", "INDICADORES", amarelo, preto),
+            ("A7:G7", "DADOS CADASTRO", azul_escuro, branco),
+            ("H7:K7", "PAGO", verde, branco),
+            ("L7:R7", "INADIMPLÊNCIA", vermelho, branco),
+            ("S7:T7", "A VENCER", azul_claro, branco),
+            ("U7:X7", "INDICADORES", amarelo, preto),
+            ("Y7:AA7", "INFORMAÇÕES", azul_escuro, branco),
         ]
 
         for faixa, titulo, cor, cor_fonte in blocos:
@@ -5672,7 +5883,7 @@ def aplicar_estilo_excel(
             celula = ws[faixa.split(":")[0]]
             celula.value = titulo
             celula.fill = PatternFill("solid", fgColor=cor)
-            celula.font = Font(bold=True, color=cor_fonte)
+            celula.font = Font(name="Calibri", size=10, bold=True, color=cor_fonte)
             celula.alignment = Alignment(horizontal="center", vertical="center")
 
             for row in ws[faixa]:
@@ -5684,18 +5895,28 @@ def aplicar_estilo_excel(
                         bottom=borda_fina_branca
                     )
 
-        for cell in ws[8]:
-            if cell.value is not None:
-                cell.value = _padronizar_rotulo_coluna_exibicao(str(cell.value))
-            cell.font = Font(bold=True, color=branco)
-            cell.fill = PatternFill("solid", fgColor=azul_escuro)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.border = Border(
-                left=borda_fina_branca,
-                right=borda_fina_branca,
-                top=borda_fina_branca,
-                bottom=borda_media_preta
-            )
+        hdr_seg_cons = [
+            ("A", "G", azul_escuro, branco),
+            ("H", "K", verde, branco),
+            ("L", "R", vermelho, branco),
+            ("S", "T", azul_claro, branco),
+            ("U", "X", amarelo, preto),
+            ("Y", "AA", azul_escuro, branco),
+        ]
+        for c0, c1, fg, fc in hdr_seg_cons:
+            for ci in range(column_index_from_string(c0), column_index_from_string(c1) + 1):
+                cell = ws.cell(row=8, column=ci)
+                if cell.value is not None:
+                    cell.value = _padronizar_rotulo_coluna_exibicao(str(cell.value))
+                cell.font = Font(name="Calibri", size=10, bold=True, color=fc)
+                cell.fill = PatternFill("solid", fgColor=fg)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = Border(
+                    left=borda_fina_branca,
+                    right=borda_fina_branca,
+                    top=borda_fina_branca,
+                    bottom=borda_media_preta
+                )
 
         mapa_colunas_principal = {str(c.value).strip(): c.column_letter for c in ws[8] if c.value is not None}
         col_aporte = mapa_colunas_principal.get("APORTE", "")
@@ -5711,6 +5932,8 @@ def aplicar_estilo_excel(
         )
         align_centro_dados = Alignment(horizontal="center", vertical="center")
         fill_aporte_row = PatternFill("solid", fgColor="FFF2CC")
+        fill_zebra_1 = PatternFill("solid", fgColor="FFFFFF")
+        fill_zebra_2 = PatternFill("solid", fgColor="F2F2F2")
         fill_x_destaque = PatternFill("solid", fgColor="FFF2CC")
         fill_f_quit = PatternFill("solid", fgColor="C6EFCE")
         fill_f_inad = PatternFill("solid", fgColor="FFC7CE")
@@ -5786,15 +6009,20 @@ def aplicar_estilo_excel(
                     cell.fill = fill_f
                 elif col == col_x_idx:
                     cell.fill = fill_x_destaque
+                else:
+                    cell.fill = fill_zebra_2 if (linha % 2 == 0) else fill_zebra_1
 
             c_f = row_cells[col_f_idx - 1]
             c_k = row_cells[col_k_idx - 1]
-            c_f.font = font_f_bold_preto
+            c_f.font = Font(name="Calibri", size=10, bold=True, color=preto)
             c_k.fill = fill_k
-            c_k.font = font_f_bold_preto
+            c_k.font = Font(name="Calibri", size=10, bold=True, color=preto)
 
-        colunas_fechamento = ["E", "J", "Q", "S", "X"]
-        colunas_fechamento_idx = [column_index_from_string(col) for col in colunas_fechamento]
+        colunas_fechamento = ["G", "K", "R", "T", "X", "AA"]
+        colunas_fechamento_idx = [
+            column_index_from_string(col) for col in colunas_fechamento
+            if column_index_from_string(col) <= max_col_data
+        ]
         for col_idx in colunas_fechamento_idx:
             for linha in range(7, ws.max_row + 1):
                 cell = ws.cell(row=linha, column=col_idx)
@@ -5805,18 +6033,57 @@ def aplicar_estilo_excel(
                     bottom=cell.border.bottom
                 )
 
+        # Larguras do modelo de referência (aba por empreendimento); reduz ####### em moeda/%.
         larguras = {
-            "A": 14, "B": 30, "C": 10, "D": 36, "E": 30, "F": 18,
-            "G": 14, "H": 12, "I": 12, "J": 14, "K": 14, "L": 18,
-            "M": 14, "N": 14, "O": 14, "P": 18, "Q": 20, "R": 14,
-            "S": 14, "T": 16, "U": 12, "V": 14, "W": 12, "X": 18, "Y": 20, "Z": 12,
+            "A": 28.88671875,
+            "B": 22.21875,
+            "C": 9.109375,
+            "D": 30.0,
+            "E": 12.5546875,
+            "F": 34.109375,
+            "G": 18.0,
+            "H": 20.6640625,
+            "I": 15.6640625,
+            "J": 15.77734375,
+            "K": 14.0,
+            "L": 21.0,
+            "M": 23.88671875,
+            "N": 19.88671875,
+            "O": 14.0,
+            "P": 13.0,
+            "Q": 24.0,
+            "R": 27.77734375,
+            "S": 19.5546875,
+            "T": 20.109375,
+            "U": 16.0,
+            "V": 12.0,
+            "W": 17.44140625,
+            "X": 16.21875,
+            "Y": 20.77734375,
+            "Z": 24.0,
+            "AA": 12.0,
         }
 
         for col, largura in larguras.items():
-            ws.column_dimensions[col].width = largura
+            if column_index_from_string(col) <= max_col_data or col == "AA":
+                ws.column_dimensions[col].width = largura
 
+        # Linhas superiores mais consistentes visualmente (painel/link/estoque).
+        for r in range(1, 7):
+            ws.row_dimensions[r].height = 18
+        ws.row_dimensions[7].height = 14.4
+        ws.row_dimensions[8].height = 14.4
+
+        _autoajustar_colunas_e_linhas(
+            ws,
+            header_row=8,
+            data_start_row=9,
+            fixed_widths={"D": 30.0, "F": 34.109375},
+            limite_coluna=column_index_from_string("AA"),
+        )
         ws.freeze_panes = "A9"
-        ws.auto_filter.ref = f"A8:{get_column_letter(ws.max_column)}{ws.max_row}"
+        ult_col = get_column_letter(max(ws.max_column, column_index_from_string("AA")))
+        ws.auto_filter.ref = f"A8:{ult_col}{ws.max_row}"
         # Planilha sem proteção: edição e exclusão de linhas liberadas.
     elif apenas_abas_apoio:
         _notify("Consolidado: ignorado (lote — abas técnicas unificadas)")
@@ -5838,7 +6105,7 @@ def aplicar_estilo_excel(
         wa["A6"] = "QTD. VENDAS (VISÍVEIS)"
         wa["B6"] = "=SUMPRODUCT(SUBTOTAL(103,OFFSET($C$9,ROW($C$9:$C$1048576)-ROW($C$9),0,1))/COUNTIFS($C$9:$C$1048576,$C$9:$C$1048576,$C$9:$C$1048576,\"<>\"))"
         for linha in range(1, 7):
-            wa[f"A{linha}"].font = Font(bold=True, color=branco)
+            wa[f"A{linha}"].font = Font(name="Calibri", size=10, bold=True, color=branco)
             wa[f"A{linha}"].fill = PatternFill("solid", fgColor=azul_escuro)
             wa[f"A{linha}"].alignment = Alignment(horizontal="left", vertical="center")
             wa[f"A{linha}"].border = Border(
@@ -5846,7 +6113,7 @@ def aplicar_estilo_excel(
                 top=borda_media_preta if linha == 1 else borda_fina_branca,
                 bottom=borda_fina_branca
             )
-            wa[f"B{linha}"].font = Font(bold=True, color=preto)
+            wa[f"B{linha}"].font = Font(name="Calibri", size=10, bold=True, color=preto)
             wa[f"B{linha}"].alignment = Alignment(horizontal="center", vertical="center")
             wa[f"B{linha}"].fill = PatternFill("solid", fgColor=cinza)
             wa[f"B{linha}"].border = Border(
@@ -5862,7 +6129,7 @@ def aplicar_estilo_excel(
             c = wa.cell(row=hr_ra, column=col_i)
             c.value = _padronizar_rotulo_coluna_exibicao(c.value)
         for cell in wa[hr_ra]:
-            cell.font = Font(bold=True, color=branco)
+            cell.font = Font(name="Calibri", size=10, bold=True, color=branco)
             cell.fill = PatternFill("solid", fgColor=azul_escuro)
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             cell.border = Border(
@@ -5871,9 +6138,17 @@ def aplicar_estilo_excel(
                 top=borda_fina_branca,
                 bottom=borda_media_preta,
             )
-        # Performance: formatação só na coluna de valor monetário (evita ~5×N escritas de estilo).
+        # Relatório com zebra cinza leve (legibilidade), preservando formatos existentes.
+        fill_rel_odd = PatternFill("solid", fgColor="FFFFFF")
+        fill_rel_even = PatternFill("solid", fgColor="F2F2F2")
         for linha in range(9, wa.max_row + 1):
             wa[f"D{linha}"].number_format = 'R$ #,##0.00'
+            row_fill = fill_rel_even if (linha % 2 == 0) else fill_rel_odd
+            for col_i in range(1, wa.max_column + 1):
+                dcell = wa.cell(row=linha, column=col_i)
+                dcell.fill = row_fill
+                dcell.border = aux_border_cinza
+                dcell.alignment = aux_alignment_centro
         wa.freeze_panes = "A9"
         wa.auto_filter.ref = f"A8:{get_column_letter(wa.max_column)}{wa.max_row}"
         for col_i in range(1, wa.max_column + 1):
@@ -5919,7 +6194,7 @@ def aplicar_estilo_excel(
 
     aux_alignment_centro = Alignment(horizontal="center", vertical="center")
     aux_border_cinza = Border(left=borda_fina_cinza, right=borda_fina_cinza, top=borda_fina_cinza, bottom=borda_fina_cinza)
-    aux_header_font = Font(bold=True, color=branco)
+    aux_header_font = Font(name="Calibri", size=10, bold=True, color=branco)
     aux_header_fill = PatternFill("solid", fgColor=azul_escuro)
 
     _notify("Abas DADOS RECEBER / DADOS RECEBIDOS: resumo, cabeçalho e formatos (sem borda em massa nos dados)")
@@ -6173,6 +6448,11 @@ def aplicar_estilo_excel(
 
         ws_pen.freeze_panes = f"A{data_start}"
         ws_pen.auto_filter.ref = f"A{header_row}:{get_column_letter(max_col_pen)}{max_row_pen}"
+
+    # Regra global solicitada: linha 7 e 8 com altura fixa em todas as abas.
+    for ws_any in wb.worksheets:
+        ws_any.row_dimensions[7].height = 14.4
+        ws_any.row_dimensions[8].height = 14.4
 
     if not apenas_abas_apoio:
         if NOME_ABA_RESUMO_GERAL in wb.sheetnames:

@@ -19,6 +19,7 @@ from typing import Dict, List, Sequence, Tuple
 
 import pandas as pd
 from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 
 from services.processador_uau import (
     NOME_ABA_RESUMO_GERAL,
@@ -703,17 +704,27 @@ def _normalizar_schema_final_base(df: pd.DataFrame, origem: str) -> pd.DataFrame
     return out
 
 
-def _aplicar_schema_e_formato_base_final(destino_base: str) -> None:
-    dr = pd.DataFrame()
-    dp = pd.DataFrame()
-    try:
-        dr = pd.read_excel(destino_base, sheet_name="DADOS_RECEBER")
-    except Exception:
-        dr = pd.DataFrame()
-    try:
-        dp = pd.read_excel(destino_base, sheet_name="DADOS_RECEBIDOS")
-    except Exception:
-        dp = pd.DataFrame()
+def _aplicar_schema_e_formato_base_final(
+    destino_base: str,
+    dr_in: pd.DataFrame | None = None,
+    dp_in: pd.DataFrame | None = None,
+) -> None:
+    """
+    Publica a base final com schema padronizado e estilo mínimo.
+    Mantém os mesmos dados, reduzindo formatação massiva célula-a-célula
+    para melhorar fluidez de abertura no Excel.
+    """
+    dr = dr_in.copy() if isinstance(dr_in, pd.DataFrame) else pd.DataFrame()
+    dp = dp_in.copy() if isinstance(dp_in, pd.DataFrame) else pd.DataFrame()
+    if dr.empty and dp.empty:
+        try:
+            dr = pd.read_excel(destino_base, sheet_name="DADOS_RECEBER")
+        except Exception:
+            dr = pd.DataFrame()
+        try:
+            dp = pd.read_excel(destino_base, sheet_name="DADOS_RECEBIDOS")
+        except Exception:
+            dp = pd.DataFrame()
 
     dr_f = _normalizar_schema_final_base(dr, "RECEBER")
     dp_f = _normalizar_schema_final_base(dp, "RECEBIDOS")
@@ -721,46 +732,16 @@ def _aplicar_schema_e_formato_base_final(destino_base: str) -> None:
         dr_f.to_excel(wr, sheet_name="DADOS_RECEBER", index=False)
         dp_f.to_excel(wr, sheet_name="DADOS_RECEBIDOS", index=False)
 
+    # Estilo enxuto: apenas autofiltro na linha de cabeçalho.
     wb = load_workbook(destino_base)
     try:
-        mapa_fmt = {
-            "DADOS_RECEBER": {
-                "texto": {"EMP/OBRA", "CLIENTE", "CLI.BASE", "IDENTIFICADOR", "PARC.(GERAL)", "STATUS", "MES.VENC.", "CLASSIFICAÇÃO"},
-                "numero": {"VENDA", "PARC.NUM", "PARC.TOTAL", "DIA.VENC.", "ANO.VENC."},
-                "data": {"VENC.DATA"},
-                "contabil": {"PRINCIPAL", "CORREÇÃO", "JUROS ATRASO", "MULTA ATRASO", "CORREÇÃO ATRASO", "VL.PARCELA"},
-            },
-            "DADOS_RECEBIDOS": {
-                "texto": {"EMP/OBRA", "CLIENTE", "CLI.BASE", "IDENTIFICADOR", "PARC.(GERAL)", "TIPO"},
-                "numero": {"VENDA", "PARC.NUM", "PARC.TOTAL"},
-                "data": {"DATA.REC."},
-                "contabil": {"PRINCIPAL", "CORREÇÃO", "JUROS ATRASO", "MULTA ATRASO", "VL.PARCELA"},
-            },
-        }
-        for aba, cfg in mapa_fmt.items():
+        for aba in ("DADOS_RECEBER", "DADOS_RECEBIDOS"):
+            if aba not in wb.sheetnames:
+                continue
             ws = wb[aba]
-            headers = [str(ws.cell(1, c).value or "").strip() for c in range(1, ws.max_column + 1)]
-            idx = {h: i + 1 for i, h in enumerate(headers) if h}
-            for h in cfg["texto"]:
-                c = idx.get(h)
-                if c:
-                    for r in range(2, ws.max_row + 1):
-                        ws.cell(r, c).number_format = "@"
-            for h in cfg["numero"]:
-                c = idx.get(h)
-                if c:
-                    for r in range(2, ws.max_row + 1):
-                        ws.cell(r, c).number_format = "0"
-            for h in cfg["data"]:
-                c = idx.get(h)
-                if c:
-                    for r in range(2, ws.max_row + 1):
-                        ws.cell(r, c).number_format = "dd/mm/yyyy"
-            for h in cfg["contabil"]:
-                c = idx.get(h)
-                if c:
-                    for r in range(2, ws.max_row + 1):
-                        ws.cell(r, c).number_format = 'R$ #,##0.00'
+            if ws.max_column > 0:
+                ult_col = get_column_letter(ws.max_column)
+                ws.auto_filter.ref = f"A1:{ult_col}1"
     finally:
         wb.save(destino_base)
         wb.close()
@@ -1135,7 +1116,7 @@ def processar_lote_uau(
             (df_dp_sql if not df_dp_sql.empty else pd.DataFrame()).to_excel(
                 wr_base, sheet_name="DADOS_RECEBIDOS", index=False
             )
-        _aplicar_schema_e_formato_base_final(tmp_base)
+        _aplicar_schema_e_formato_base_final(tmp_base, df_dr_sql, df_dp_sql)
         try:
             shutil.copy2(tmp_base, destino_base)
         except OSError:

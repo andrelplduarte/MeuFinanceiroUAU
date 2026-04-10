@@ -29,6 +29,10 @@ outputs/*.xlsx
 outputs/*.csv
 outputs/*.tmp
 
+# Quick local validation workspace (generated artifacts)
+tests_rapidos/saida/*
+!tests_rapidos/saida/.gitkeep
+
 # Local ad-hoc notes/logs
 *.log
 2026-*.md

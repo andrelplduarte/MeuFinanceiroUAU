@@ -182,6 +182,305 @@ def _pretratar_texto_estoque(texto: str) -> str:
     return "\n".join(out)
 
 
+_TOKENS_INVALIDOS_IDENT = {
+    "",
+    "NONE",
+    "NULL",
+    "NAN",
+    "0",
+    "00",
+    "000",
+    "0000",
+}
+
+
+def _normalizar_status_estoque(status: str) -> str:
+    su = _fold_upper(status)
+    if not su:
+        return ""
+    if "DISPON" in su:
+        return "DISPONIVEL"
+    if "VENDID" in su:
+        return "VENDIDO"
+    if "QUITAD" in su:
+        return "QUITADO"
+    if "ESCRITUR" in su:
+        return "ESCRITURADO"
+    if "SUSPENS" in su:
+        return "SUSPENSO P/ VENDA"
+    if "FORA" in su and "VENDA" in su:
+        return "FORA DE VENDA"
+    return su
+
+
+def _eh_linha_ruido_estoque(linha: str) -> bool:
+    su = _fold_upper(linha)
+    if not su:
+        return True
+    blocos_ruido = (
+        "UAU! SOFTWARE",
+        "RELATORIO DE ESTOQUE",
+        "RELATÓRIO DE ESTOQUE",
+        "PAGINA",
+        "PÁGINA",
+        "USUARIO",
+        "USUÁRIO",
+        "PERIODO DE",
+        "PERÍODO DE",
+        "HORARIO",
+        "HORÁRIO",
+        "TOTAL DE UNIDADES COM STATUS",
+        "TOTAL DE UNIDADES DA EMPRESA",
+        "OBRA\tIDENTIFICADOR",
+    )
+    if any(x in su for x in blocos_ruido):
+        return True
+    if su.startswith("TOTAL ") or su.startswith("TOTAL\t"):
+        return True
+    if re.fullmatch(r"[-\s\d/.:]+", su):
+        return True
+    return False
+
+
+def _identificador_valido(ident: str) -> bool:
+    s = _fold_upper(str(ident or ""))
+    s = re.sub(r"\s+", "", s)
+    if s in _TOKENS_INVALIDOS_IDENT:
+        return False
+    if re.fullmatch(r"0+", s or "0"):
+        return False
+    return True
+
+
+def _padronizar_identificador_estoque(ident: str) -> str:
+    s = _normalizar_linha_estoque(ident)
+    s = normalizar_identificador(s)
+    s = re.sub(r"\s{2,}", " ", str(s or "").strip())
+    return s if _identificador_valido(s) else "NLOC"
+
+
+def _normalizar_emp_obra_estoque(emp_obra: str) -> str:
+    s = str(emp_obra or "").strip().upper()
+    s = s.replace("51/BELAW", "51/BVGWH")
+    s = s.replace("72/ROSA", "72/VROLT")
+    if re.match(r"^\d+/\d+$", s):
+        return ""
+    return s
+
+
+def _extrair_identificador_de_linha_contextual(resto_linha: str) -> str:
+    if not str(resto_linha or "").strip():
+        return "NLOC"
+    # Em exports UAU, colunas costumam vir separadas por 2+ espaços.
+    blocos = [b.strip() for b in re.split(r"\s{2,}", str(resto_linha or "").strip()) if b.strip()]
+    candidato = blocos[0] if blocos else str(resto_linha or "").strip()
+    # Remove caudas monetárias quando estiverem no mesmo bloco.
+    candidato = re.sub(r"\s+\d{1,3}(?:\.\d{3})*,\d{2}\s*$", "", candidato).strip()
+    candidato = re.sub(r"\s+\d+[.,]\d{2}\s*$", "", candidato).strip()
+    candidato = re.sub(r"\s+\d{5,}\s*$", "", candidato).strip()
+    return _padronizar_identificador_estoque(candidato)
+
+
+def _limpar_frases_operacionais_estoque(linha: str) -> str:
+    s = str(linha or "")
+    frases = (
+        "ASSISTENTE DE RECEBIMENTO",
+        "RECEBIMENTO DE PARCELAS",
+        "CONTAS A RECEBER",
+        "ASSISTENTE DE VENDA SIMPLIFICADO",
+        "ASSISTENTE DE VENDA",
+        "CANCELAMENTO DE VENDA",
+        "RECEBIMENTO",
+    )
+    for f in frases:
+        s = re.sub(rf"\b{re.escape(f)}\b", " ", s, flags=re.IGNORECASE)
+    # Corrige número monetário quebrado por espaço após vírgula.
+    s = re.sub(r"(\d{1,3}(?:\.\d{3})*),\s+(\d{2})", r"\1,\2", s)
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    return s
+
+
+def _carregar_estoque_bloco_contextual(linhas: list[str], vazio: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fallback para TXT de estoque em bloco hierárquico (Empresa/Status),
+    quando não há cabeçalho TSV confiável.
+    """
+    empresa_codigo = ""
+    empresa_nome = ""
+    status_atual = ""
+    registros = []
+
+    re_empresa = re.compile(r"^\s*EMPRESA\s*:\s*(\d+)\s*[-–]\s*(.+?)\s*$", flags=re.IGNORECASE)
+    re_status = re.compile(r"^\s*STATUS\s*:\s*([0-9A-Z]+)\s*[-–]\s*(.+?)\s*$", flags=re.IGNORECASE)
+    re_obra = re.compile(r"^\s*([A-Z0-9]{3,10})\s+(.+?)\s*$")
+    re_mult = re.compile(
+        r"\b([A-Z0-9]{4,6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d{5,})(?=\s+[A-Z0-9]{4,6}\s+|$)"
+    )
+    re_id_direto = re.compile(
+        r"\b([A-Z0-9]{4,6})\s+"
+        r"(\d+\s*-\s*BLOCO\s*\d+|BLOCO\s*\d+\s*/\s*APTO\s*\d+|QUADRA\s*\d+\s*/\s*LOTE\s*\d+|QD\s*\d+\s*/\s*LT\s*\d+|APTO\s*\d+|\d+\s*-\s*TORRE\s*\d+|GARAGEM\s*N\s*\d+(?:\s*-\s*\d+[A-Z]?)?)",
+        flags=re.IGNORECASE,
+    )
+    obra_banidas = {
+        "BLOCO",
+        "QUADRA",
+        "LOTE",
+        "APTO",
+        "SALA",
+        "STATUS",
+        "TOTAL",
+        "ASSISTE",
+        "RECEBI",
+        "PARCEL",
+        "CONTAS",
+        "CANCEL",
+        "VENDA",
+    }
+
+    for ln in linhas:
+        s = _normalizar_linha_estoque(ln)
+        s = _limpar_frases_operacionais_estoque(s)
+        if _eh_linha_ruido_estoque(s):
+            continue
+
+        m_emp = re_empresa.match(s)
+        if m_emp:
+            empresa_codigo = str(m_emp.group(1) or "").strip()
+            empresa_nome = str(m_emp.group(2) or "").strip()
+            continue
+
+        m_st = re_status.match(s)
+        if m_st:
+            status_atual = _normalizar_status_estoque(str(m_st.group(2) or ""))
+            continue
+
+        m_obra = re_obra.match(s)
+        if not m_obra:
+            continue
+
+        diretos = list(re_id_direto.finditer(s))
+        if diretos:
+            for m in diretos:
+                obra = str(m.group(1) or "").strip().upper()
+                ident_raw = str(m.group(2) or "").strip()
+                obra_fold = _fold_upper(obra)
+                if not obra or obra_fold in {"OBRA", "CODIGO", "COD", "EMP", "EMP/OBRA"}:
+                    continue
+                if any(b in obra_fold for b in obra_banidas):
+                    continue
+                ident = _padronizar_identificador_estoque(ident_raw)
+                emp_obra = f"{empresa_codigo}/{obra}" if empresa_codigo else obra
+                emp_obra = _normalizar_emp_obra_estoque(emp_obra)
+                if not emp_obra:
+                    continue
+                registros.append(
+                    {
+                        "Obra": emp_obra,
+                        "Empresa_Nome": empresa_nome,
+                        "Identificador": ident,
+                        "Status_Estoque": status_atual,
+                        "Motivo_Estoque": "",
+                        "Venda": "",
+                        "Status_Construcao": "",
+                        "Valores_Ref": "",
+                    }
+                )
+            continue
+
+        candidatos = list(re_mult.finditer(s))
+        if candidatos:
+            for m in candidatos:
+                obra = str(m.group(1) or "").strip().upper()
+                ident_raw = str(m.group(2) or "").strip()
+                obra_fold = _fold_upper(obra)
+                if not obra or obra_fold in {"OBRA", "CODIGO", "COD", "EMP", "EMP/OBRA"}:
+                    continue
+                if any(b in obra_fold for b in obra_banidas):
+                    continue
+                ident = _padronizar_identificador_estoque(ident_raw)
+                emp_obra = f"{empresa_codigo}/{obra}" if empresa_codigo else obra
+                emp_obra = _normalizar_emp_obra_estoque(emp_obra)
+                if not emp_obra:
+                    continue
+                registros.append(
+                    {
+                        "Obra": emp_obra,
+                        "Empresa_Nome": empresa_nome,
+                        "Identificador": ident,
+                        "Status_Estoque": status_atual,
+                        "Motivo_Estoque": "",
+                        "Venda": "",
+                        "Status_Construcao": "",
+                        "Valores_Ref": "",
+                    }
+                )
+            continue
+
+        obra = str(m_obra.group(1) or "").strip().upper()
+        resto = str(m_obra.group(2) or "").strip()
+        obra_fold = _fold_upper(obra)
+        if not obra or not resto:
+            continue
+        if obra_fold in {"OBRA", "CODIGO", "COD", "EMP", "EMP/OBRA"}:
+            continue
+        if any(b in obra_fold for b in obra_banidas):
+            continue
+
+        ident = _extrair_identificador_de_linha_contextual(resto)
+        emp_obra = f"{empresa_codigo}/{obra}" if empresa_codigo else obra
+        emp_obra = _normalizar_emp_obra_estoque(emp_obra)
+        if not emp_obra:
+            continue
+        registros.append(
+            {
+                "Obra": emp_obra,
+                "Empresa_Nome": empresa_nome,
+                "Identificador": ident,
+                "Status_Estoque": status_atual,
+                "Motivo_Estoque": "",
+                "Venda": "",
+                "Status_Construcao": "",
+                "Valores_Ref": "",
+            }
+        )
+
+    if not registros:
+        return vazio
+    df = pd.DataFrame(registros)
+    df = df.loc[df["Identificador"].fillna("").astype(str).str.strip() != ""].copy()
+    if df.empty:
+        return vazio
+    df = df.drop_duplicates(subset=["Obra", "Identificador"], keep="last")
+    return df.reset_index(drop=True)
+
+
+def _parse_tsv_parece_ruidoso(df: pd.DataFrame) -> bool:
+    if df is None or df.empty:
+        return True
+    try:
+        obra = df["Obra"].fillna("").astype(str).str.strip()
+        ident = df["Identificador"].fillna("").astype(str).str.strip()
+        status = df.get("Status_Estoque", pd.Series([""] * len(df))).fillna("").astype(str).str.strip()
+
+        bad_obra = obra.str.contains(r"[:]|RELAT|PERIOD|USUAR|STATUS|OBRA\b", case=False, regex=True)
+        bad_ident = ident.str.contains(r"IDENTIFICADOR|RELAT|PERIOD|USUAR|STATUS", case=False, regex=True)
+        taxa_ruido = float((bad_obra | bad_ident).mean())
+
+        obra_ok = obra.str.upper().str.match(r"^(\d+/)?[A-Z0-9]{4,6}$")
+        taxa_obra_ok = float(obra_ok.mean())
+        taxa_status_preenchido = float((status != "").mean())
+
+        if taxa_ruido > 0.07:
+            return True
+        if taxa_obra_ok < 0.65:
+            return True
+        if taxa_status_preenchido < 0.03:
+            return True
+        return False
+    except Exception:
+        return True
+
+
 def carregar_estoque_bruto(caminho_arquivo: str | None) -> pd.DataFrame:
     """
     Lê TXT tabular de estoque UAU. Colunas opcionais: VENDA, STATUS_DA_CONSTRUCAO (ou sinônimos).
@@ -229,7 +528,7 @@ def carregar_estoque_bruto(caminho_arquivo: str | None) -> pd.DataFrame:
             break
 
     if header_i < 0:
-        return vazio
+        return _carregar_estoque_bloco_contextual(linhas, vazio)
 
     hn = [_norm_header_cell(h) for h in headers_raw]
     j_obra = _indice_coluna(
@@ -299,8 +598,18 @@ def carregar_estoque_bruto(caminho_arquivo: str | None) -> pd.DataFrame:
         )
 
     if not registros:
-        return vazio
-    return pd.DataFrame(registros)
+        return _carregar_estoque_bloco_contextual(linhas, vazio)
+
+    df = pd.DataFrame(registros)
+    if "Status_Estoque" in df.columns:
+        df["Status_Estoque"] = df["Status_Estoque"].map(_normalizar_status_estoque)
+    if "Identificador" in df.columns:
+        df["Identificador"] = df["Identificador"].map(_padronizar_identificador_estoque)
+    if _parse_tsv_parece_ruidoso(df):
+        df_ctx = _carregar_estoque_bloco_contextual(linhas, vazio)
+        if df_ctx is not None and not df_ctx.empty:
+            return df_ctx
+    return df
 
 
 def _join_vendas(serie: pd.Series) -> str:
