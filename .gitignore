@@ -37,3 +37,6 @@ tests_rapidos/saida/*
 *.log
 2026-*.md
 2026-*.txt
+
+CARTEIRAS*.xlsx
+_tmp_lote_uau/
