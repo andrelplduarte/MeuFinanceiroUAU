@@ -5046,6 +5046,13 @@ def montar_consolidado(
 # =========================
 # ESTILO
 # =========================
+# Limites do modo turbo / autoajuste rápido na pós-formatação openpyxl.
+# Rollback operacional: aumentar o valor desativa o modo agressivo sem reverter o PR inteiro.
+LIMIAR_LINHAS_TURBO_CONSOLIDADO = 25000
+LIMIAR_LINHAS_TURBO_RELATORIO_ANALITICO = 30000
+LIMIAR_LINHAS_TURBO_PENDENCIAS = 12000
+
+
 def _desfazer_merges_faixa_linhas(ws, linha_min: int, linha_max: int) -> None:
     """Remove merges que interceptam [linha_min, linha_max] (reaplicar blocos/cabeçalho sem conflito)."""
     for mcr in list(ws.merged_cells.ranges):
@@ -5063,6 +5070,8 @@ def _autoajustar_colunas_e_linhas(
     data_start_row: int = 9,
     fixed_widths: dict | None = None,
     limite_coluna: int | None = None,
+    max_scan_rows: int = 4000,
+    modo_rapido: bool = False,
 ) -> None:
     """
     Autoajuste de colunas/linhas por conteúdo, preservando larguras fixas informadas.
@@ -5071,11 +5080,18 @@ def _autoajustar_colunas_e_linhas(
     fixed = {str(k).upper(): float(v) for k, v in (fixed_widths or {}).items()}
     max_col = int(limite_coluna or ws.max_column or 1)
     max_row = int(ws.max_row or data_start_row)
-    scan_until = min(max_row, 4000)
+    scan_until = min(max_row, max(1, int(max_scan_rows or 4000)))
     for col in range(1, max_col + 1):
         letter = get_column_letter(col)
         if letter in fixed:
             ws.column_dimensions[letter].width = fixed[letter]
+            continue
+        if modo_rapido:
+            v_header = ws.cell(row=header_row, column=col).value
+            tam = len(str(v_header or "").strip())
+            if tam <= 0:
+                continue
+            ws.column_dimensions[letter].width = min(max(tam + 3, 10), 28)
             continue
         best = 0
         for row in range(header_row, scan_until + 1):
@@ -5094,6 +5110,8 @@ def _autoajustar_colunas_e_linhas(
             ws.column_dimensions[letter].width = width
         else:
             ws.column_dimensions[letter].width = max(float(cur), float(width))
+    if modo_rapido:
+        return
     # Altura de linhas apenas para dados longos (mantém cabeçalho estável).
     for row in range(data_start_row, scan_until + 1):
         longest = 0
@@ -5610,6 +5628,15 @@ def aplicar_estilo_excel(
             except Exception:
                 pass
 
+    _heartbeat_estado: dict[str, float] = {}
+
+    def _notify_timed(chave: str, msg: str, intervalo_segundos: float = 1.5):
+        agora = time.perf_counter()
+        ultimo = _heartbeat_estado.get(chave, 0.0)
+        if (agora - ultimo) >= intervalo_segundos:
+            _heartbeat_estado[chave] = agora
+            _notify(msg)
+
     def _norm_txt(s):
         t = str(s or "").strip().upper()
         repl = {
@@ -5962,16 +5989,47 @@ def aplicar_estilo_excel(
         col_k_idx = column_index_from_string("K")
         col_x_idx = column_index_from_string("X")
 
-        _notify(f"Consolidado: formatação das linhas de dados (9..{max_row_data})")
-        for linha in range(9, max_row_data + 1):
-            status = str(ws.cell(row=linha, column=col_f_idx).value or "").strip().upper()
+        linhas_consolidado = max(max_row_data - 8, 0)
+        modo_turbo_consolidado = linhas_consolidado >= LIMIAR_LINHAS_TURBO_CONSOLIDADO
+        if modo_turbo_consolidado:
+            _notify(
+                "Consolidado: modo turbo ativado para base grande "
+                f"({linhas_consolidado} linhas) — sem grade completa e zebra pesada."
+            )
+        else:
+            _notify(f"Consolidado: formatação das linhas de dados (9..{max_row_data})")
+
+        colunas_fechamento_idx = {
+            column_index_from_string(col)
+            for col in ("G", "K", "R", "T", "X", "AA")
+            if column_index_from_string(col) <= max_col_data
+        }
+        border_data_fechamento = Border(
+            left=borda_fina_cinza,
+            right=borda_media_preta,
+            top=borda_fina_cinza,
+            bottom=borda_fina_cinza,
+        )
+        total_linhas_cons = max(max_row_data - 8, 1)
+        for idx_linha, row_cells in enumerate(
+            ws.iter_rows(min_row=9, max_row=max_row_data, min_col=1, max_col=max_col_data),
+            start=1,
+        ):
+            linha = row_cells[0].row
+            pct = int((idx_linha / total_linhas_cons) * 100)
+            _notify_timed(
+                "consolidado_linhas",
+                f"Consolidado: linhas {linha}/{max_row_data} ({pct}%)",
+                intervalo_segundos=1.2,
+            )
+            status = str(row_cells[col_f_idx - 1].value or "").strip().upper()
             if status == "QUITADO":
                 fill_f = fill_f_quit
             elif status == "INADIMPLENTE":
                 fill_f = fill_f_inad
             else:
                 fill_f = fill_f_outros
-            valor = ws.cell(row=linha, column=col_k_idx).value
+            valor = row_cells[col_k_idx - 1].value
             try:
                 qtd = int(valor or 0)
             except Exception:
@@ -5984,54 +6042,34 @@ def aplicar_estilo_excel(
                 fill_k = fill_k_1
             else:
                 fill_k = fill_k_0
-            aporte_sim = False
-            if col_aporte_num:
-                valor_ap = str(ws.cell(row=linha, column=col_aporte_num).value or "").strip().upper()
-                aporte_sim = valor_ap == "SIM"
-
-            row_cells = next(
-                ws.iter_rows(
-                    min_row=linha,
-                    max_row=linha,
-                    min_col=1,
-                    max_col=max_col_data,
-                )
+            aporte_sim = bool(
+                col_aporte_num and str(row_cells[col_aporte_num - 1].value or "").strip().upper() == "SIM"
             )
             for col, cell in enumerate(row_cells, start=1):
-                cell.alignment = align_centro_dados
-                cell.border = border_data
                 fmt = col_formato_cache[col - 1]
                 if fmt:
                     cell.number_format = fmt
-                if aporte_sim:
-                    cell.fill = fill_aporte_row
-                elif col == col_f_idx:
+                if not modo_turbo_consolidado:
+                    cell.alignment = align_centro_dados
+                    cell.border = border_data_fechamento if col in colunas_fechamento_idx else border_data
+                if col == col_f_idx:
                     cell.fill = fill_f
                 elif col == col_x_idx:
                     cell.fill = fill_x_destaque
+                elif modo_turbo_consolidado:
+                    if aporte_sim and col <= min(max_col_data, 2):
+                        cell.fill = fill_aporte_row
                 else:
+                    if aporte_sim:
+                        cell.fill = fill_aporte_row
+                        continue
                     cell.fill = fill_zebra_2 if (linha % 2 == 0) else fill_zebra_1
 
             c_f = row_cells[col_f_idx - 1]
             c_k = row_cells[col_k_idx - 1]
-            c_f.font = Font(name="Calibri", size=10, bold=True, color=preto)
+            c_f.font = font_f_bold_preto
             c_k.fill = fill_k
-            c_k.font = Font(name="Calibri", size=10, bold=True, color=preto)
-
-        colunas_fechamento = ["G", "K", "R", "T", "X", "AA"]
-        colunas_fechamento_idx = [
-            column_index_from_string(col) for col in colunas_fechamento
-            if column_index_from_string(col) <= max_col_data
-        ]
-        for col_idx in colunas_fechamento_idx:
-            for linha in range(7, ws.max_row + 1):
-                cell = ws.cell(row=linha, column=col_idx)
-                cell.border = Border(
-                    left=cell.border.left,
-                    right=borda_media_preta,
-                    top=cell.border.top,
-                    bottom=cell.border.bottom
-                )
+            c_k.font = font_f_bold_preto
 
         # Larguras do modelo de referência (aba por empreendimento); reduz ####### em moeda/%.
         larguras = {
@@ -6074,12 +6112,15 @@ def aplicar_estilo_excel(
         ws.row_dimensions[7].height = 14.4
         ws.row_dimensions[8].height = 14.4
 
+        _scan_rows = 600 if max_row_data > 40000 else 1200 if max_row_data > 20000 else 4000
         _autoajustar_colunas_e_linhas(
             ws,
             header_row=8,
             data_start_row=9,
             fixed_widths={"D": 30.0, "F": 34.109375},
             limite_coluna=column_index_from_string("AA"),
+            max_scan_rows=_scan_rows,
+            modo_rapido=max_row_data > LIMIAR_LINHAS_TURBO_CONSOLIDADO,
         )
         ws.freeze_panes = "A9"
         ult_col = get_column_letter(max(ws.max_column, column_index_from_string("AA")))
@@ -6138,17 +6179,51 @@ def aplicar_estilo_excel(
                 top=borda_fina_branca,
                 bottom=borda_media_preta,
             )
-        # Relatório com zebra cinza leve (legibilidade), preservando formatos existentes.
+        # Relatório com zebra cinza leve (legibilidade).
+        # Em bases muito grandes, evitar borda/alinhamento célula a célula em toda a grade
+        # para não bloquear a etapa final por vários minutos.
+        data_start_ra = 9
         fill_rel_odd = PatternFill("solid", fgColor="FFFFFF")
         fill_rel_even = PatternFill("solid", fgColor="F2F2F2")
-        for linha in range(9, wa.max_row + 1):
-            wa[f"D{linha}"].number_format = 'R$ #,##0.00'
-            row_fill = fill_rel_even if (linha % 2 == 0) else fill_rel_odd
-            for col_i in range(1, wa.max_column + 1):
-                dcell = wa.cell(row=linha, column=col_i)
-                dcell.fill = row_fill
-                dcell.border = aux_border_cinza
-                dcell.alignment = aux_alignment_centro
+        linhas_ra = max(wa.max_row - data_start_ra + 1, 0)
+        modo_turbo_rel_analitico = linhas_ra > LIMIAR_LINHAS_TURBO_RELATORIO_ANALITICO
+        if modo_turbo_rel_analitico:
+            _notify(
+                "Relatório analítico: modo turbo ativado para base grande "
+                f"({linhas_ra} linhas) — aplicando apenas formato essencial."
+            )
+            intervalo_nf = 10000
+            for linha in range(data_start_ra, wa.max_row + 1):
+                if (linha - data_start_ra) % intervalo_nf == 0:
+                    pct_ra = int(((linha - data_start_ra + 1) / max(linhas_ra, 1)) * 100)
+                    _notify_timed(
+                        "relatorio_analitico_turbo",
+                        f"Relatório analítico (turbo): linhas {linha}/{wa.max_row} ({pct_ra}%)",
+                        intervalo_segundos=1.2,
+                    )
+                wa[f"D{linha}"].number_format = 'R$ #,##0.00'
+        else:
+            aplicar_borda_em_massa = wa.max_row <= 20000
+            intervalo_heartbeat_ra = 2000
+            _notify(f"Relatório analítico: zebra nas linhas ({data_start_ra}..{wa.max_row})")
+            for linha in range(data_start_ra, wa.max_row + 1):
+                if (linha - data_start_ra) % intervalo_heartbeat_ra == 0:
+                    pct_ra = int(((linha - data_start_ra + 1) / max(linhas_ra, 1)) * 100)
+                    _notify_timed(
+                        "relatorio_analitico",
+                        f"Relatório analítico: linhas {linha}/{wa.max_row} ({pct_ra}%)",
+                        intervalo_segundos=1.2,
+                    )
+                wa[f"D{linha}"].number_format = 'R$ #,##0.00'
+                row_fill = fill_rel_even if (linha % 2 == 0) else fill_rel_odd
+                for col_i in range(1, wa.max_column + 1):
+                    dcell = wa.cell(row=linha, column=col_i)
+                    dcell.fill = row_fill
+                    if aplicar_borda_em_massa:
+                        dcell.border = aux_border_cinza
+                        dcell.alignment = aux_alignment_centro
+            if not aplicar_borda_em_massa:
+                _notify("Relatório analítico: modo otimizado ativado (sem borda célula a célula em base grande)")
         wa.freeze_panes = "A9"
         wa.auto_filter.ref = f"A8:{get_column_letter(wa.max_column)}{wa.max_row}"
         for col_i in range(1, wa.max_column + 1):
@@ -6313,8 +6388,16 @@ def aplicar_estilo_excel(
             col = mapa_colunas.get(nome_col.upper())
             if col:
                 col_fmt_pairs.append((col, "0"))
-        for linha in range(data_start, max_row_aux + 1):
-            for col_letter, fmt in col_fmt_pairs:
+        linhas_aux = max(max_row_aux - data_start + 1, 0)
+        for col_letter, fmt in col_fmt_pairs:
+            for idx_linha, linha in enumerate(range(data_start, max_row_aux + 1), start=1):
+                if idx_linha % 12000 == 0:
+                    pct_aux = int((idx_linha / max(linhas_aux, 1)) * 100)
+                    _notify_timed(
+                        f"{nome_aba}_fmt",
+                        f"{nome_aba}: aplicando formato em {col_letter} ({linha}/{max_row_aux}, {pct_aux}%)",
+                        intervalo_segundos=1.2,
+                    )
                 ws_aux[f"{col_letter}{linha}"].number_format = fmt
 
         max_col_aux = ws_aux.max_column
@@ -6417,11 +6500,25 @@ def aplicar_estilo_excel(
             for linha in range(data_start, max_row_pen + 1):
                 ws_pen[f"{letra}{linha}"].number_format = nf
 
-        for linha in range(data_start, max_row_pen + 1):
-            for col_i in range(1, max_col_pen + 1):
-                c = ws_pen.cell(row=linha, column=col_i)
-                c.alignment = aux_alignment_centro
-                c.border = aux_border_cinza
+        linhas_pen = max(max_row_pen - data_start + 1, 0)
+        modo_turbo_pendencias = linhas_pen >= LIMIAR_LINHAS_TURBO_PENDENCIAS
+        if modo_turbo_pendencias:
+            _notify(
+                "Pendências: base grande detectada — mantendo cabeçalho e formatos essenciais sem grade total."
+            )
+        else:
+            for idx_linha, linha in enumerate(range(data_start, max_row_pen + 1), start=1):
+                if idx_linha % 4000 == 0:
+                    pct_pen = int((idx_linha / max(linhas_pen, 1)) * 100)
+                    _notify_timed(
+                        "pendencias_grade",
+                        f"Pendências: alinhamento/grade ({linha}/{max_row_pen}, {pct_pen}%)",
+                        intervalo_segundos=1.2,
+                    )
+                for col_i in range(1, max_col_pen + 1):
+                    c = ws_pen.cell(row=linha, column=col_i)
+                    c.alignment = aux_alignment_centro
+                    c.border = aux_border_cinza
 
         larg_pen = {
             "venda": 12,
@@ -6533,7 +6630,7 @@ def aplicar_estilo_excel(
     except Exception:
         pass
 
-    _notify("Gravando workbook no disco")
+    _notify("Gravando workbook no disco (etapa final, pode levar alguns minutos em base grande)")
     if NOME_ABA_RESUMO_GERAL in wb.sheetnames and wb.sheetnames[0] != NOME_ABA_RESUMO_GERAL:
         try:
             idx_rg = wb.sheetnames.index(NOME_ABA_RESUMO_GERAL)
@@ -6570,6 +6667,7 @@ def processar_e_gerar_excel(
     gerar_aba_resumo_geral=True,
     caminho_estoque=None,
     gerar_aba_consolidado_estoque=True,
+    progresso_cb=None,
 ):
     """
     Parâmetros opcionais (somente orquestração em lote):
@@ -6645,6 +6743,13 @@ def processar_e_gerar_excel(
     def _dbg(msg):
         if DEBUG_VALIDACAO:
             print(f"[DEBUG][processar_e_gerar_excel] {msg}")
+
+    def _emitir_progresso_motor(**payload):
+        if callable(progresso_cb):
+            try:
+                progresso_cb(payload)
+            except Exception:
+                pass
 
     def _resumo_df(df, nome):
         if df is None or df.empty:
@@ -8899,17 +9004,36 @@ def processar_e_gerar_excel(
             "(em bases grandes esta etapa costuma ser a mais longa).",
             flush=True,
         )
+        _emitir_progresso_motor(
+            status="processando",
+            mensagem="Formatação final do Excel em andamento.",
+            item_atual_abas="FORMATAÇÃO FINAL",
+            abas_item=["FORMATAÇÃO FINAL"],
+            tempo_decorrido_segundos=max(0.0, time.perf_counter() - t_perf0),
+        )
         _ind_est = (
             calcular_indicadores_painel_consolidado_estoque(df_consolidado_estoque)
             if gerar_aba_consolidado_estoque
             else None
         )
+        def _cb_estilo(msg: str):
+            txt = str(msg or "").strip()
+            if not txt:
+                return
+            _emitir_progresso_motor(
+                status="processando",
+                mensagem=f"Formatação final: {txt}",
+                item_atual_abas=txt[:120],
+                abas_item=[txt[:80]],
+                tempo_decorrido_segundos=max(0.0, time.perf_counter() - t_perf0),
+            )
         aplicar_estilo_excel(
             caminho_saida=caminho_saida_final,
             data_base=data_base,
             nome_empreendimento=nome_empreendimento,
             nome_aba_principal=nome_aba_principal,
             indicadores_estoque=_ind_est,
+            progress_cb=_cb_estilo,
         )
         _emit_perf(
             "excel_pos_formatacao_openpyxl",
