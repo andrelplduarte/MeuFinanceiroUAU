@@ -687,7 +687,8 @@ def limpar_lote():
 
 @app.route("/limpar-cache", methods=["POST"])
 def limpar_cache():
-    if _ha_processamento_ativo():
+    force = str(request.form.get("forcar_limpeza") or "").strip() == "1"
+    if _ha_processamento_ativo() and not force:
         session["cache_notice"] = "Não foi possível limpar o cache: existe processamento ativo em andamento."
         session["cache_notice_type"] = "erro"
         return redirect(url_for("index"))
@@ -697,6 +698,7 @@ def limpar_cache():
 
     rem_uploads, err_uploads = _limpar_conteudo_diretorio(UPLOAD_FOLDER)
     rem_outputs, err_outputs = _limpar_conteudo_diretorio(OUTPUT_FOLDER)
+    rem_progress, err_progress = _limpar_conteudo_diretorio(PROGRESS_FOLDER)
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -717,15 +719,17 @@ def limpar_cache():
     ):
         session.pop(key, None)
 
-    if err_uploads or err_outputs:
+    if err_uploads or err_outputs or err_progress:
         session["cache_notice"] = (
-            f"Cache limpo parcialmente. Removidos: uploads={rem_uploads}, outputs={rem_outputs}. "
-            f"Não removidos: uploads={err_uploads}, outputs={err_outputs}."
+            "Cache limpo parcialmente. "
+            f"Removidos: uploads={rem_uploads}, outputs={rem_outputs}, progress={rem_progress}. "
+            f"Não removidos: uploads={err_uploads}, outputs={err_outputs}, progress={err_progress}."
         )
         session["cache_notice_type"] = "erro"
     else:
         session["cache_notice"] = (
-            f"Cache limpo com sucesso. Removidos: uploads={rem_uploads}, outputs={rem_outputs}."
+            "Cache limpo com sucesso. "
+            f"Removidos: uploads={rem_uploads}, outputs={rem_outputs}, progress={rem_progress}."
         )
         session["cache_notice_type"] = "ok"
     return redirect(url_for("index"))

@@ -205,9 +205,17 @@
             margin-bottom: 0.28em;
         }
 
-        .hero-v2__title-gradient {
+        /*
+         * Logo UAU (PNG) com o mesmo gradiente animado do título antigo:
+         * o PNG é máscara por luminância; o fundo é o linear-gradient + hero-title-flow.
+         */
+        .hero-v2__title-uau-gradient {
             display: block;
-            margin-top: 0;
+            margin: 0.1em auto 0;
+            width: min(100%, 640px);
+            height: clamp(4.25rem, 22vw, 7rem);
+            margin-left: auto;
+            margin-right: auto;
             background: linear-gradient(
                 105deg,
                 #ffffff 0%,
@@ -218,10 +226,18 @@
                 #e8ecf2 100%
             );
             background-size: 220% auto;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
             animation: hero-title-flow 10s linear infinite;
+            -webkit-mask-image: url("{{ url_for('static', filename='img/uau-logo-minimal.png') }}?v=4");
+            mask-image: url("{{ url_for('static', filename='img/uau-logo-minimal.png') }}?v=4");
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            -webkit-mask-mode: luminance;
+            mask-mode: luminance;
+            filter: drop-shadow(0 4px 28px rgba(212, 36, 62, 0.2));
         }
 
         @keyframes hero-title-flow {
@@ -230,7 +246,11 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .hero-v2__title-gradient { animation: none; background-position: 40% 50%; }
+            .hero-v2__title-uau-gradient {
+                animation: none;
+                background-position: 40% 50%;
+                filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.35));
+            }
         }
 
         .hero-v2__subtitle {
@@ -1718,7 +1738,11 @@
                         </p>
                         <h1 id="hero-title" class="hero-v2__title">
                             <span class="hero-v2__title-prefix">Central</span>
-                            <span class="hero-v2__title-gradient">UAU</span>
+                            <span
+                                class="hero-v2__title-uau-gradient"
+                                role="img"
+                                aria-label="UAU"
+                            ></span>
                         </h1>
                         <p class="hero-v2__subtitle">
                             Gestão financeira e imobiliária — relatórios UAU, consolidados em Excel e operação pronta para escala.
@@ -1947,6 +1971,19 @@
                     onclick="return confirm('Isso vai limpar uploads, outputs e progresso. Deseja continuar?');"
                 >
                     Limpar cache do sistema
+                </button>
+                <button
+                    type="submit"
+                    name="forcar_limpeza"
+                    value="1"
+                    formnovalidate
+                    formaction="{{ url_for('limpar_cache') }}"
+                    formmethod="post"
+                    class="btn-file-secondary"
+                    style="margin-top:8px;border-color: rgba(255, 170, 77, 0.55); color:#ffe1bf;"
+                    onclick="return confirm('Forçar limpeza vai remover uploads, outputs e progresso mesmo com execução ativa. Deseja continuar?');"
+                >
+                    Forçar limpeza do cache
                 </button>
             </div>
             <div class="panel-body">
@@ -2320,6 +2357,7 @@
             var timerId = null;
             var pollId = null;
             var inicioMs = 0;
+            var ultimoTempoServidorSeg = 0;
             var progressoRealAtivo = false;
             var estimativaAtualSegundos = 0;
             var estimativaTotalSegundos = 0;
@@ -2757,8 +2795,14 @@
                 progressoRealAtivo = true;
                 var tDec = Number(data.tempo_decorrido_segundos || 0);
                 if (tDec > 0) {
-                    inicioMs = Date.now() - Math.floor(tDec) * 1000;
-                    if (contador) contador.textContent = formatarMmSs(Math.floor(tDec));
+                    var srvSeg = Math.floor(tDec);
+                    var localSeg = Math.max(0, Math.floor((Date.now() - inicioMs) / 1000));
+                    /* Evita "congelar" o contador visual: só reancora se o servidor avançou de fato. */
+                    if (srvSeg > ultimoTempoServidorSeg && srvSeg > (localSeg + 1)) {
+                        inicioMs = Date.now() - srvSeg * 1000;
+                        if (contador) contador.textContent = formatarMmSs(srvSeg);
+                    }
+                    ultimoTempoServidorSeg = Math.max(ultimoTempoServidorSeg, srvSeg);
                 }
                 var total = Math.max(1, Number(data.total_empreendimentos || 1));
                 var concluidos = clamp(Number(data.concluidos || 0), 0, total);
@@ -2855,6 +2899,7 @@
             function iniciarContador(segundosIniciais) {
                 var baseSeg = Math.max(0, Math.floor(Number(segundosIniciais || 0)));
                 inicioMs = Date.now() - baseSeg * 1000;
+                ultimoTempoServidorSeg = Math.max(0, baseSeg);
                 progressoRealAtivo = false;
                 monitor.classList.remove("concluido");
                 monitor.classList.add("ativo");

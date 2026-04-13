@@ -948,6 +948,17 @@ def processar_lote_uau(
                 gerar_aba_resumo_geral=False,
                 gerar_aba_consolidado_estoque=False,
                 caminho_estoque=ce_chave,
+                progresso_cb=lambda payload, _ch=chave, _i=idx: _emitir_progresso(
+                    status=str((payload or {}).get("status") or "processando"),
+                    total_empreendimentos=len(chaves_ok),
+                    concluidos=_i - 1,
+                    empreendimento_atual=str(_ch),
+                    item_atual_abas=str((payload or {}).get("item_atual_abas") or nome_aba_consolidado),
+                    abas_item=(payload or {}).get("abas_item") or [nome_aba_consolidado],
+                    itens_tempo=tempos_por_item,
+                    tempo_decorrido_segundos=(payload or {}).get("tempo_decorrido_segundos") or max(0.0, time.perf_counter() - t0),
+                    mensagem=(payload or {}).get("mensagem"),
+                ),
             )
             _emitir_progresso(
                 status="processando",
@@ -1181,7 +1192,7 @@ def processar_entrada_simples_ou_lote(
                 except Exception:
                     pass
             return processar_e_gerar_excel(
-                cr[0], cp[0], caminho_saida_base, caminho_estoque=ce_par
+                cr[0], cp[0], caminho_saida_base, caminho_estoque=ce_par, progresso_cb=progresso_cb
             )
         finally:
             for p in tmp_est_par:
