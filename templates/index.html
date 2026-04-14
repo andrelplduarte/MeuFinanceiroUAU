@@ -1932,12 +1932,36 @@
                     {% if resumo_itens_tempo %}
                     <div class="post-tempo-box">
                         <div class="post-tempo-title">Confira o tempo de processamento de cada arquivo</div>
+                        {% set nomes_empreendimento_tempo = {
+                            "NVLOT": "NVLOT - LOT.RES.NILSON VELOSO",
+                            "LTMAG": "LTMAG - LOT.RES.MAGALHAES",
+                            "SCPTO": "SCPTO - LOT.RES.VALE DO TOCANTINS",
+                            "SCPTI": "SCPTI - LOT.RES.TIRADENTES",
+                            "CIDAN": "CIDAN - LOT.RES.CIDADE NOVA",
+                            "VROLT": "VROLT - LOT.RES.VALE DAS ROSAS",
+                            "ALVLT": "ALVLT - LOT.RES.ALVORADA",
+                            "LTMON": "LTMON - LOT.RES.MONTE NEGRO",
+                            "RVERD": "RVERD - LOT.RES.IO VERDE",
+                            "LTVIL": "LTVIL - LOT.RES.VILA NOVA",
+                            "LTMIN": "LTMIN - LOT.RES.BAIRRO DOS MINERIOS",
+                            "SCPGO": "SCPGO - LOT.RES.GOIANIA",
+                            "ARAHF": "ARAHF - INC.RES.ARARAS",
+                            "BVGWH": "BVGWH - INC.COND.BELLA WHITE",
+                            "MANHA": "MANHA - INC.MANHATAN",
+                            "MONTB": "MONTB - INC.MONTBLANC",
+                            "LIFE": "LIFE - INC.LIFE",
+                        } %}
                         <div class="post-tempo-grid">
                             {% for item in resumo_itens_tempo %}
                             {% set cor = (item.cor|default('azul')) %}
+                            {% set sigla_item = item.empreendimento|default('')|string|upper|trim %}
+                            {% set nome_item = nomes_empreendimento_tempo.get(sigla_item, sigla_item if sigla_item else 'ITEM') %}
                             <div class="post-tempo-item">
-                                <span class="post-tempo-emp">{{ item.empreendimento|default('ITEM') }}</span>
-                                <span class="post-tempo-val">{{ "%.2f"|format(item.segundos|default(0)|float) }} s</span>
+                                <span class="post-tempo-emp">{{ nome_item }}</span>
+                                {% set total_s = item.segundos|default(0)|float %}
+                                {% set mm = (total_s // 60)|int %}
+                                {% set ss = (total_s % 60)|int %}
+                                <span class="post-tempo-val">{{ "%d:%02d"|format(mm, ss) }}</span>
                                 <span class="post-badge post-{{ cor }}">{{ cor }}</span>
                             </div>
                             {% endfor %}
@@ -2649,6 +2673,22 @@
                         el.value = "";
                         el.dispatchEvent(new Event("change", { bubbles: true }));
                     }
+                    if (!form) return;
+                    var acaoLimpar = "";
+                    if (id === "arquivo_receber" && persistedReceber > 0) {
+                        acaoLimpar = "limpar_receber";
+                    } else if (id === "arquivo_recebidos" && persistedRecebidos > 0) {
+                        acaoLimpar = "limpar_recebidos";
+                    } else if (id === "arquivo_estoque" && persistedEstoque > 0) {
+                        acaoLimpar = "remover_estoque";
+                    }
+                    if (!acaoLimpar) return;
+                    var hiddenAcao = document.createElement("input");
+                    hiddenAcao.type = "hidden";
+                    hiddenAcao.name = "acao";
+                    hiddenAcao.value = acaoLimpar;
+                    form.appendChild(hiddenAcao);
+                    form.submit();
                 });
             });
 

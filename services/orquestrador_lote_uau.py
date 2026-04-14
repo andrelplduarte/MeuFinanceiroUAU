@@ -577,11 +577,6 @@ def _padronizar_colunas_base_para_negocio(df: pd.DataFrame, origem: str) -> pd.D
             ("PARC.NUM", ("PARC_NUM",)),
             ("PARC.TOTAL", ("PARC_TOTAL",)),
             ("DATA.REC.", ("DATA_REC",)),
-            ("TIPO", ("TIPO",)),
-            ("PRINCIPAL", ("PRINCIPAL",)),
-            ("CORREÇÃO", ("CORRECAO",)),
-            ("JUROS ATRASO", ("JUROS_ATRASO",)),
-            ("MULTA ATRASO", ("MULTA_ATRASO",)),
             ("VL.PARCELA", ("VL_PARCELA", "VLR_PARCELA", "TOTAL_DEP")),
         ]
 
@@ -693,11 +688,6 @@ def _normalizar_schema_final_base(df: pd.DataFrame, origem: str) -> pd.DataFrame
             "PARC.NUM": pick("PARC_NUM"),
             "PARC.TOTAL": pick("PARC_TOTAL"),
             "DATA.REC.": pick("DATA_REC"),
-            "TIPO": pick("TIPO"),
-            "PRINCIPAL": pick("PRINCIPAL"),
-            "CORREÇÃO": pick("CORRECAO"),
-            "JUROS ATRASO": pick("JUROS_ATRASO"),
-            "MULTA ATRASO": pick("MULTA_ATRASO"),
             "VL.PARCELA": pick("VL_PARCELA", "VLR_PARCELA", "TOTAL_DEP"),
         }
     )
@@ -1117,6 +1107,67 @@ def processar_lote_uau(
         destino_exec = os.path.join(pasta_saida, "CARTEIRAS GERAL.xlsx")
         destino_base = os.path.join(pasta_saida, "CARTEIRAS BANCO DE DADOS.xlsx")
         wb_exec.save(destino_exec)
+
+        # Lote: gera CONSOLIDADO ESTOQUE somente no arquivo final
+        # (sem criar aba de estoque nos workbooks intermediários por empreendimento).
+        if caminhos_estoque:
+            from services.estoque_uau import (
+                COLUNAS_SAIDA_CONSOLIDADO_ESTOQUE,
+                CONSOLIDADO_ESTOQUE_PANDAS_STARTROW,
+                NOME_ABA_CONSOLIDADO_ESTOQUE,
+                calcular_indicadores_painel_consolidado_estoque,
+                carregar_estoque_bruto,
+                montar_dataframe_consolidado_estoque,
+            )
+
+            partes_consolidado_lote: List[pd.DataFrame] = []
+            for pth in caminhos_motor_para_resumo:
+                dfc = consolidado_cache_por_path.get(pth)
+                if isinstance(dfc, pd.DataFrame) and not dfc.empty:
+                    partes_consolidado_lote.append(dfc)
+            df_consolidado_lote = (
+                pd.concat(partes_consolidado_lote, ignore_index=True, sort=False)
+                if partes_consolidado_lote
+                else pd.DataFrame()
+            )
+            caminho_estoque_lote = _resolver_estoque_unificado_lote(
+                caminhos_estoque or [], temporarios
+            )
+            df_estoque_in = carregar_estoque_bruto(caminho_estoque_lote or "")
+            df_consolidado_estoque = montar_dataframe_consolidado_estoque(
+                df_consolidado_lote, df_estoque_in
+            )
+            if df_consolidado_estoque.empty:
+                df_consolidado_estoque = pd.DataFrame(
+                    columns=COLUNAS_SAIDA_CONSOLIDADO_ESTOQUE
+                )
+
+            with pd.ExcelWriter(
+                destino_exec,
+                engine="openpyxl",
+                mode="a",
+                if_sheet_exists="replace",
+            ) as wr_exec:
+                df_consolidado_estoque.to_excel(
+                    wr_exec,
+                    sheet_name=NOME_ABA_CONSOLIDADO_ESTOQUE,
+                    index=False,
+                    startrow=CONSOLIDADO_ESTOQUE_PANDAS_STARTROW,
+                )
+            data_base_lote = (
+                _data_base_de_primeiro_xlsx_motor(caminhos_motor_para_resumo[0])
+                if caminhos_motor_para_resumo
+                else None
+            )
+            indicadores_estoque = calcular_indicadores_painel_consolidado_estoque(
+                df_consolidado_estoque
+            )
+            aplicar_estilo_arquivo_so_aba_consolidado_estoque(
+                destino_exec,
+                data_base_lote,
+                "LOTE - TODOS OS EMPREENDIMENTOS",
+                indicadores_painel=indicadores_estoque,
+            )
 
         # Windows-safe: escreve primeiro em arquivo temporário e só então publica no destino final.
         tmp_base = os.path.join(pasta_temp_local, f"uau_base_sql_{uuid.uuid4().hex}.xlsx")

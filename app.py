@@ -355,6 +355,20 @@ def index():
             _persistir_estado_uploads(estado)
             return redirect(url_for("index"))
 
+        if acao == "limpar_receber":
+            for item in list(estado.get("receber", [])):
+                _remover_arquivo_local(item.get("path"))
+            estado["receber"] = []
+            _persistir_estado_uploads(estado)
+            return redirect(url_for("index"))
+
+        if acao == "limpar_recebidos":
+            for item in list(estado.get("recebidos", [])):
+                _remover_arquivo_local(item.get("path"))
+            estado["recebidos"] = []
+            _persistir_estado_uploads(estado)
+            return redirect(url_for("index"))
+
         if acao == "limpar_lote":
             _limpar_lote_uploads(estado)
             return redirect(url_for("index"))

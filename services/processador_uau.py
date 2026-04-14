@@ -10,6 +10,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter, column_index_from_string
+from openpyxl.utils.cell import quote_sheetname
 
 from services.etl_preprocessamento_uau import (
     obter_etl_stats_acumulado,
@@ -63,29 +64,45 @@ NOME_ABA_RESUMO_GERAL = "RESUMO GERAL"
 # Chave: SIGLA (ex.: ALVLT) OU EMP/OBRA normalizado OU nome do empreendimento normalizado.
 # Valor: URL completa (https://...).
 MAPA_LINKS_DRIVE_EMPREENDIMENTO = {
-    # "ALVLT": "https://drive.google.com/drive/folders/SEU_LINK_AQUI",
+    "NVLOT": "https://drive.google.com/drive/folders/COLE_LINK_NVLOT",
+    "LTMAG": "https://drive.google.com/drive/folders/1Jv7nUHigYLQyvDx_RsoBt1zX4R_adlrB",
+    "SCPTO": "https://drive.google.com/drive/folders/1nOMBP8udfjtEokkHWub9G_5nrjwIoizs",
+    "SCPTI": "https://drive.google.com/drive/folders/1iDISqG4mQLIfcUrf3ZBRumJLgynI4T3a",
+    "CIDAN": "https://drive.google.com/drive/folders/1U_R0vZCtBUnzRrZmThq1sBA5KGB_usW3",
+    "VROLT": "https://drive.google.com/drive/folders/1KphscK3Kv3tp_HC-FzVvjLgLDaL_Z4kB",
+    "ALVLT": "https://drive.google.com/drive/folders/1cPDgewWBUiWzRl_l5g0zHMKnIIXuoDYs",
+    "LTMON": "https://drive.google.com/drive/folders/1s8xmoz8G9ByTOqCQzcOEhN-LVfst0APH",
+    "RVERD": "https://drive.google.com/drive/folders/COLE_LINK_RVERD",
+    "LTVIL": "https://drive.google.com/drive/folders/1csTlqosfRlf6W1-jZRfgxRq1sSt_f5Ik",
+    "LTMIN": "https://drive.google.com/drive/folders/1ZC2UAr5Cj8VIwB9MQ1le4OfObdEDUPhe",
+    "SCPGO": "https://drive.google.com/drive/folders/COLE_LINK_SCPGO",
+    "ARAHF": "https://drive.google.com/drive/folders/1AcP51anpZX8l3WwnTkKYZgOU7JwGz-Es",
+    "BVGWH": "https://drive.google.com/drive/folders/1M8FaqJM5ps405xB9pKrOskzsWiahXLXb",
+    "MANHA": "https://drive.google.com/drive/folders/COLE_LINK_MANHA",
+    "MONTB": "https://drive.google.com/drive/folders/COLE_LINK_MONTB",
+    "LIFE": "https://drive.google.com/drive/folders/COLE_LINK_LIFE",
 }
 
 # De-para oficial de empreendimento (fonte única para exibição no topo e colunas).
 # Chave: sigla normalizada (ex.: ALVLT). Valor: nome oficial de exibição.
 MAPA_EMPREENDIMENTO_OFICIAL_POR_SIGLA = {
-    "NVLOT": "RES.NILSON VELOSO",
-    "LTMAG": "RES.MAGALHAES",
-    "SCPTO": "LOT.TOCANTINS",
-    "SCPTI": "LOT.TIRADENTES",
-    "CIDAN": "RES.CIDADE NOVA",
-    "VROLT": "LOT.VALE DAS ROSAS",
-    "ALVLT": "RES.ALVORADA",
-    "LTMON": "LOT.MONTE NEGRO",
-    "RVERD": "RIO VERDE",
-    "LTVIL": "LOT.VILA NOVA",
-    "LTMIN": "LOT.MINERIOS",
-    "SCPGO": "RES.GOIANIA",
-    "ARAHF": "RES.ARARAS",
-    "BVGWH": "COND.BELLA WHITE",
-    "MANHA": "MANHATAN",
-    "MONTB": "MONTBLANC",
-    "LIFE": "LIFE",
+    "NVLOT": "LOT.RES.NILSON VELOSO",
+    "LTMAG": "LOT.RES.MAGALHAES",
+    "SCPTO": "LOT.RES.VALE DO TOCANTINS",
+    "SCPTI": "LOT.RES.TIRADENTES",
+    "CIDAN": "LOT.RES.CIDADE NOVA",
+    "VROLT": "LOT.RES.VALE DAS ROSAS",
+    "ALVLT": "LOT.RES.ALVORADA",
+    "LTMON": "LOT.RES.MONTE NEGRO",
+    "RVERD": "LOT.RES.IO VERDE",
+    "LTVIL": "LOT.RES.VILA NOVA",
+    "LTMIN": "LOT.RES.BAIRRO DOS MINERIOS",
+    "SCPGO": "LOT.RES.GOIANIA",
+    "ARAHF": "INC.RES.ARARAS",
+    "BVGWH": "INC.COND.BELLA WHITE",
+    "MANHA": "INC.MANHATAN",
+    "MONTB": "INC.MONTBLANC",
+    "LIFE": "INC.LIFE",
 }
 
 
@@ -5166,7 +5183,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
         pass
     ws.merge_cells("C1:L6")
     ws["C1"] = "RESUMO GERAL"
-    ws["C1"].font = Font(bold=False, color=branco, size=46)
+    ws["C1"].font = Font(name="Calibri", bold=True, color=branco, size=72)
     ws["C1"].fill = PatternFill("solid", fgColor=azul_escuro)
     ws["C1"].alignment = Alignment(horizontal="center", vertical="center")
     ws["M1"] = "PAINEL ESTOQUE"
@@ -5324,6 +5341,85 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                 top=cell.border.top,
                 bottom=cell.border.bottom,
             )
+
+    def _norm_txt_rg(valor) -> str:
+        s = str(valor or "").strip().upper()
+        s = unicodedata.normalize("NFKD", s)
+        s = "".join(ch for ch in s if not unicodedata.combining(ch))
+        s = re.sub(r"\s+", " ", s)
+        return s
+
+    def _sigla_aba_consolidado(nome_aba: str) -> str:
+        n = _norm_txt_rg(nome_aba)
+        if (
+            not n
+            or n == _norm_txt_rg(NOME_ABA_RESUMO_GERAL)
+            or n in {"DADOS RECEBER", "DADOS RECEBIDOS", "PEND.PARCELAS", "RELATORIO ANALITICO", "CRITERIOS ANALISES", "CONSOLIDADO ESTOQUE"}
+        ):
+            return ""
+        m = re.match(r"^([A-Z0-9]{2,})", n)
+        return m.group(1) if m else ""
+
+    def _mapa_headers_aba(ws_aba):
+        out = {}
+        for c in ws_aba[8]:
+            if c.value is None:
+                continue
+            out[_norm_txt_rg(c.value)] = c.column_letter
+        return out
+
+    def _achar_coluna(headers: dict, aliases) -> str:
+        for a in aliases:
+            na = _norm_txt_rg(a)
+            if na in headers:
+                return headers[na]
+        for a in aliases:
+            na = _norm_txt_rg(a)
+            for h, col in headers.items():
+                if na and na in h:
+                    return col
+        return ""
+
+    mapa_sigla_para_aba = {}
+    for nome_aba in wb.sheetnames:
+        sig = _sigla_aba_consolidado(nome_aba)
+        if sig and sig not in mapa_sigla_para_aba:
+            mapa_sigla_para_aba[sig] = nome_aba
+
+    # Lote por empreendimento: converte as linhas do RESUMO em fórmulas dinâmicas
+    # para respeitar filtros aplicados em cada aba consolidada.
+    for linha in range(9, max_row_data + 1):
+        emp_obra = str(ws[f"A{linha}"].value or "").strip()
+        if not emp_obra:
+            continue
+        sig = normalizar_emp_obra(emp_obra)
+        nome_aba_cons = mapa_sigla_para_aba.get(sig)
+        if not nome_aba_cons or nome_aba_cons not in wb.sheetnames:
+            continue
+        hs = _mapa_headers_aba(wb[nome_aba_cons])
+        c_venda = _achar_coluna(hs, ("VENDA",))
+        c_qpago = _achar_coluna(hs, ("QTD.PARC.PAGA", "QTD.PARC.PAGO", "QTD.PAGO"))
+        c_vlpago = _achar_coluna(hs, ("VL.PAGO",))
+        c_qinad = _achar_coluna(hs, ("QTD.PARC.VENCIDA", "QTD.PARC.ATRASADA", "QTD.PARC.INADIMPLENCIA"))
+        c_vlinad = _achar_coluna(hs, ("VL.PRINCIPAL (ENCARGOS)", "VL.VENCIDO", "VALOR INADIMPLENCIA"))
+        c_qav = _achar_coluna(hs, ("QTD.PARC.A VENCER",))
+        c_vlav = _achar_coluna(hs, ("VL.A VENCER", "VL.VENCER"))
+        c_vlcart = _achar_coluna(hs, ("VL.CARTEIRA",))
+        if not all((c_venda, c_qpago, c_vlpago, c_qinad, c_vlinad, c_qav, c_vlav, c_vlcart)):
+            continue
+        aba_q = quote_sheetname(nome_aba_cons)
+        ws[f"C{linha}"] = f"=SUBTOTAL(103,{aba_q}!${c_venda}$9:${c_venda}$1048576)"
+        ws[f"D{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_qpago}$9:${c_qpago}$1048576)"
+        ws[f"E{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_vlpago}$9:${c_vlpago}$1048576)"
+        ws[f"F{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_qinad}$9:${c_qinad}$1048576)"
+        ws[f"G{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_vlinad}$9:${c_vlinad}$1048576)"
+        ws[f"H{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_qav}$9:${c_qav}$1048576)"
+        ws[f"I{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_vlav}$9:${c_vlav}$1048576)"
+        ws[f"J{linha}"] = f"=SUBTOTAL(109,{aba_q}!${c_vlcart}$9:${c_vlcart}$1048576)"
+        ws[f"K{linha}"] = f"=IFERROR(E{linha}/J{linha},0)"
+        ws[f"L{linha}"] = f"=IFERROR(G{linha}/J{linha},0)"
+        ws[f"M{linha}"] = f"=IFERROR(I{linha}/J{linha},0)"
+        ws[f"N{linha}"] = f"=IF(L{linha}>=15%,\"ALTO\",IF(L{linha}>=5%,\"MÉDIO\",\"BAIXO\"))"
 
     # Larguras do modelo de referência (Downloads\CARTEIRAS GERAL.xlsx), aba RESUMO GERAL.
     larguras_rg = {
@@ -5770,7 +5866,7 @@ def aplicar_estilo_excel(
             pass
         ws.merge_cells("C1:U6")
         ws["C1"] = nome_oficial_titulo
-        ws["C1"].font = Font(name="Calibri", bold=True, color=branco, size=46)
+        ws["C1"].font = Font(name="Calibri", bold=True, color=branco, size=72)
         ws["C1"].fill = PatternFill("solid", fgColor=azul_escuro)
         ws["C1"].alignment = Alignment(horizontal="center", vertical="center")
         ws["A2"] = "DATA-BASE"
@@ -5799,10 +5895,10 @@ def aplicar_estilo_excel(
         link_drive = _resolver_link_drive_empreendimento(ws)
         ws["V6"] = "LINK DRIVE"
         if link_drive:
-            ws["W6"] = "ABRIR DOCUMENTOS"
+            ws["W6"] = "ACESSE CLICANDO AQUI"
             ws["W6"].hyperlink = link_drive
         else:
-            ws["W6"] = "LINK NÃO CADASTRADO"
+            ws["W6"] = "SEM LINK INFORMADO"
         try:
             ws.unmerge_cells("W6:Y6")
         except Exception:
@@ -5858,7 +5954,13 @@ def aplicar_estilo_excel(
             left=borda_media_preta, right=borda_fina_branca,
             top=borda_media_preta, bottom=borda_fina_branca
         )
-        ws["W6"].font = Font(name="Calibri", size=10, bold=True, color="FFFFFF" if link_drive else preto, underline="single" if link_drive else None)
+        ws["W6"].font = Font(
+            name="Calibri",
+            size=10,
+            bold=True,
+            color="FFFFFF" if link_drive else "C00000",
+            underline="single" if link_drive else None,
+        )
         ws["W6"].fill = PatternFill("solid", fgColor="1D4ED8" if link_drive else "E5E7EB")
         ws["W6"].alignment = Alignment(horizontal="center", vertical="center")
         ws["W6"].border = Border(
@@ -5899,8 +6001,8 @@ def aplicar_estilo_excel(
         blocos = [
             ("A7:G7", "DADOS CADASTRO", azul_escuro, branco),
             ("H7:K7", "PAGO", verde, branco),
-            ("L7:R7", "INADIMPLÊNCIA", vermelho, branco),
-            ("S7:T7", "A VENCER", azul_claro, branco),
+            ("L7:Q7", "INADIMPLÊNCIA", vermelho, branco),
+            ("R7:T7", "A VENCER", azul_claro, branco),
             ("U7:X7", "INDICADORES", amarelo, preto),
             ("Y7:AA7", "INFORMAÇÕES", azul_escuro, branco),
         ]
@@ -5925,8 +6027,8 @@ def aplicar_estilo_excel(
         hdr_seg_cons = [
             ("A", "G", azul_escuro, branco),
             ("H", "K", verde, branco),
-            ("L", "R", vermelho, branco),
-            ("S", "T", azul_claro, branco),
+            ("L", "Q", vermelho, branco),
+            ("R", "T", azul_claro, branco),
             ("U", "X", amarelo, preto),
             ("Y", "AA", azul_escuro, branco),
         ]
@@ -6001,7 +6103,7 @@ def aplicar_estilo_excel(
 
         colunas_fechamento_idx = {
             column_index_from_string(col)
-            for col in ("G", "K", "R", "T", "X", "AA")
+            for col in ("G", "K", "Q", "T", "X", "AA")
             if column_index_from_string(col) <= max_col_data
         }
         border_data_fechamento = Border(
