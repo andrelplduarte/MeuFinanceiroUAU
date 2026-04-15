@@ -2,6 +2,7 @@
 import time
 import json
 import uuid
+import re
 import threading
 import shutil
 from datetime import datetime
@@ -81,6 +82,19 @@ def _formatar_tempo_mm_ss(segundos: float) -> str:
         s = 0
     m, sec = divmod(s, 60)
     return f"{m}:{sec:02d}"
+
+
+def _normalizar_sigla_tempo(empreendimento: str) -> str:
+    """
+    Normaliza chaves vindas do lote para casar com o mapa de exibição no frontend.
+    Exemplos: '73LTMAG' -> 'LTMAG', '51BVGW H' -> 'BVGWH'.
+    """
+    s = str(empreendimento or "").upper().strip()
+    if not s:
+        return ""
+    s = re.sub(r"[^A-Z0-9]+", "", s)
+    s = re.sub(r"^\d+", "", s)
+    return s
 
 
 def _agora_str() -> str:
@@ -458,8 +472,14 @@ def index():
             erros_validacao.append("Envie ao menos um arquivo TXT de Contas Recebidas.")
 
         modo_geracao = (request.form.get("modo_geracao") or "").strip()
+        modo_geracao_up = modo_geracao.upper()
+        if modo_geracao_up in {"ARQUIVOS_GERAIS", "GERAL", "GERAIS"}:
+            if not (len(estado["receber"]) == 1 and len(estado["recebidos"]) == 1):
+                erros_validacao.append(
+                    "No modo Arquivos gerais, envie exatamente 1 arquivo de Receber e 1 de Recebidos."
+                )
         if len(estado["receber"]) > 1 or len(estado["recebidos"]) > 1:
-            if modo_geracao != "POR_EMPREENDIMENTO":
+            if modo_geracao_up != "POR_EMPREENDIMENTO":
                 erros_validacao.append(
                     "Com mais de um arquivo em algum campo, selecione o modo: "
                     "Por empreendimento."
@@ -663,6 +683,10 @@ def index():
             progresso_final = _get_progresso(process_token) or {}
             if isinstance(progresso_final.get("itens_tempo"), list):
                 resumo_item_tempo = progresso_final.get("itens_tempo") or []
+            for item in resumo_item_tempo:
+                if not isinstance(item, dict):
+                    continue
+                item["empreendimento"] = _normalizar_sigla_tempo(item.get("empreendimento"))
             resumo_item_tempo = sorted(
                 resumo_item_tempo,
                 key=lambda x: float((x or {}).get("segundos") or 0.0),

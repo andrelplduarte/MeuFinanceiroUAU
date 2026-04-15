@@ -34,6 +34,10 @@ from services.processador_uau import (
     ler_texto_robusto,
     limpar_nome_empreendimento,
     montar_dataframe_resumo_geral,
+    normalizar_emp_obra,
+    is_main_receber_line,
+    is_main_recebidos_line,
+    split_linha_tabular,
     processar_e_gerar_excel,
     sanitizar_nome_arquivo,
     _estrutura_minima_uau_ok,
@@ -41,6 +45,11 @@ from services.processador_uau import (
 )
 
 MODO_POR_EMPREENDIMENTO = "POR_EMPREENDIMENTO"
+MODO_ARQUIVOS_GERAIS = "ARQUIVOS_GERAIS"
+_ALIASES_MODO_POR_EMPREENDIMENTO = frozenset(
+    {"POR_EMPREENDIMENTO", "POR EMPREENDIMENTO", "EMP", "2"}
+)
+_ALIASES_MODO_ARQUIVOS_GERAIS = frozenset({"ARQUIVOS_GERAIS", "GERAL", "GERAIS", "3"})
 
 # Nome de exibição da aba consolidada em CARTEIRAS GERAL.xlsx (lote por empreendimento).
 # Chave = sigla normalizada (maiúsculas). Ausente na tabela → fallback "<SIGLA> – CONSOLIDADO".
@@ -114,6 +123,9 @@ _PREFIXOS_NAO_SIGLA = frozenset(
         "TXT",
         "REL",
         "RELATORIO",
+        "GERAL",
+        "GERAIS",
+        "ARQUIVOS",
     }
 )
 
@@ -154,6 +166,19 @@ def _sigla_curta_do_caminho(caminho: str) -> str:
         return sanitizar_nome_arquivo(m.group(1))[:20]
     base = os.path.splitext(b)[0][:12]
     return sanitizar_nome_arquivo(base) if base else "EMP"
+
+
+def _sigla_canonica_para_saida(valor: str) -> str:
+    """
+    Normaliza sigla para nomeação/ordenação de abas no lote final.
+    Remove prefixo numérico de chaves do modo ARQUIVOS_GERAIS (ex.: 16CIDAN -> CIDAN),
+    preservando o padrão homologado do modo antigo.
+    """
+    s = sanitizar_nome_arquivo(str(valor or "").upper())
+    if not s:
+        return ""
+    s = re.sub(r"^\d+", "", s)
+    return s or "EMP"
 
 
 def _chave_pareamento_por_prefixo_arquivo(caminho: str) -> str:
@@ -284,6 +309,231 @@ def _resolver_estoque_por_chave_lote(
     m = _fundir_textos_em_temp(lst, f"est_{chave}_")
     temporarios.append(m)
     return m
+
+
+def _detectar_emp_obra_em_linha_tabular(linha: str) -> str:
+    partes = split_linha_tabular(linha)
+    if not partes:
+        return ""
+    return str(partes[0] or "").strip()
+
+
+def _chave_empreendimento_geral_homologada(emp_obra_bruta: str) -> str:
+    """
+    Chave de split/pareamento no modo ARQUIVOS_GERAIS com a mesma normalização homologada
+    do sistema (normalizar_emp_obra), sem criar regra paralela.
+    """
+    eo = normalizar_emp_obra(emp_obra_bruta)
+    if not eo:
+        return ""
+    return sanitizar_nome_arquivo(eo)
+
+
+def _split_arquivo_geral_receber_por_emp(caminho_txt: str) -> Dict[str, List[str]]:
+    """
+    Separa um TXT geral de RECEBER em blocos por Emp/Obra preservando linhas no formato
+    esperado pelo parser atual (sem alterar regras financeiras).
+    """
+    texto = ler_texto_robusto(caminho_txt)
+    linhas = [x.rstrip("\r").rstrip("\n") for x in str(texto or "").splitlines()]
+    out: Dict[str, List[str]] = defaultdict(list)
+    bloco_prod: List[str] = []
+    i = 0
+    while i < len(linhas):
+        linha = str(linhas[i] or "").strip()
+        if not linha:
+            i += 1
+            continue
+        if linha.startswith("Prod.\t"):
+            bloco_prod = [linha]
+            if i + 1 < len(linhas):
+                prox = str(linhas[i + 1] or "").strip()
+                partes_prod = split_linha_tabular(prox)
+                if len(partes_prod) >= 5:
+                    bloco_prod.append(prox)
+                    i += 2
+                    continue
+            i += 1
+            continue
+        if is_main_receber_line(linha):
+            emp = _detectar_emp_obra_em_linha_tabular(linha)
+            if emp:
+                k = _chave_empreendimento_geral_homologada(emp)
+                if not k:
+                    i += 1
+                    continue
+                if bloco_prod:
+                    out[k].extend(bloco_prod)
+                out[k].append(linha)
+                bloco_prod = []
+        i += 1
+    return out
+
+
+def _split_arquivo_geral_recebidos_por_emp(caminho_txt: str) -> Dict[str, List[str]]:
+    """
+    Separa um TXT geral de RECEBIDOS em blocos por Emp/Obra preservando o fluxo de
+    Prod./linhas de produto associado à próxima linha principal.
+    """
+    texto = ler_texto_robusto(caminho_txt)
+    linhas = [x.rstrip("\r").rstrip("\n") for x in str(texto or "").splitlines()]
+    out: Dict[str, List[str]] = defaultdict(list)
+    bloco_prod: List[str] = []
+    prod_mode = False
+    i = 0
+    while i < len(linhas):
+        linha = str(linhas[i] or "").strip()
+        if not linha:
+            i += 1
+            continue
+        if linha.startswith("Prod.\t"):
+            bloco_prod = [linha]
+            prod_mode = True
+            i += 1
+            continue
+        if prod_mode:
+            if is_main_recebidos_line(linha):
+                prod_mode = False
+            else:
+                partes_prod = split_linha_tabular(linha)
+                if len(partes_prod) >= 5 and str(partes_prod[0] or "").strip():
+                    bloco_prod.append(linha)
+                    i += 1
+                    continue
+                prod_mode = False
+        if is_main_recebidos_line(linha):
+            emp = _detectar_emp_obra_em_linha_tabular(linha)
+            if emp:
+                k = _chave_empreendimento_geral_homologada(emp)
+                if not k:
+                    i += 1
+                    continue
+                if bloco_prod:
+                    out[k].extend(bloco_prod)
+                out[k].append(linha)
+                bloco_prod = []
+        i += 1
+    return out
+
+
+def _escrever_bloco_temp_txt(prefixo: str, linhas: Sequence[str], *, tipo: str) -> str:
+    meses_pt = {
+        1: "janeiro",
+        2: "fevereiro",
+        3: "março",
+        4: "abril",
+        5: "maio",
+        6: "junho",
+        7: "julho",
+        8: "agosto",
+        9: "setembro",
+        10: "outubro",
+        11: "novembro",
+        12: "dezembro",
+    }
+    dt_max: datetime | None = None
+    for ln in linhas:
+        for m in re.finditer(r"\b(\d{2})/(\d{2})/(\d{4})\b", str(ln or "")):
+            try:
+                d = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+            except Exception:
+                continue
+            if dt_max is None or d > dt_max:
+                dt_max = d
+    if dt_max is None:
+        dt_max = datetime.now()
+    data_base_ext = f"{dt_max.day} de {meses_pt.get(dt_max.month, 'janeiro')} de {dt_max.year}"
+
+    fd, path = tempfile.mkstemp(prefix=prefixo + "_", suffix=".txt", text=True)
+    cab_tipo = "Contas a Receber" if str(tipo).upper() == "RECEBER" else "Contas Recebidas"
+    cab_periodo = "Período por Vencimento" if str(tipo).upper() == "RECEBER" else "Período por Recebimento"
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"{data_base_ext}\n")
+        f.write(f"{cab_tipo}\n")
+        f.write(f"{cab_periodo}\n")
+        f.write("\n".join([str(x) for x in linhas if str(x).strip()]))
+        f.write("\n")
+    return path
+
+
+def processar_lote_arquivos_gerais(
+    caminho_receber_geral: str,
+    caminho_recebidos_geral: str,
+    caminho_saida_base: str,
+    caminhos_estoque: Sequence[str] | None = None,
+    progresso_cb=None,
+) -> Tuple[Tuple[str, str], float]:
+    """
+    Novo modo de ingestão: recebe 2 arquivos gerais (Receber/Recebidos), separa por Emp/Obra
+    e reaproveita o pipeline de lote por empreendimento já existente.
+    """
+    c_r = os.path.abspath(os.path.normpath(str(caminho_receber_geral or "")))
+    c_p = os.path.abspath(os.path.normpath(str(caminho_recebidos_geral or "")))
+    if not c_r or not os.path.isfile(c_r) or not c_p or not os.path.isfile(c_p):
+        raise ProcessamentoUAUErro(
+            etapa="validação",
+            funcao="processar_lote_arquivos_gerais",
+            validacao="arquivos gerais",
+            mensagem="Informe 1 arquivo geral de Receber e 1 de Recebidos válidos.",
+            campo_ou_aba="upload",
+        )
+    _validar_tipo_arquivo(c_r, "RECEBER", "Contas a Receber (geral)")
+    _validar_tipo_arquivo(c_p, "RECEBIDOS", "Contas Recebidas (geral)")
+
+    grupos_r = _split_arquivo_geral_receber_por_emp(c_r)
+    grupos_p = _split_arquivo_geral_recebidos_por_emp(c_p)
+    chaves = sorted(set(grupos_r.keys()) & set(grupos_p.keys()))
+    if not chaves:
+        raise ProcessamentoUAUErro(
+            etapa="ingestão",
+            funcao="processar_lote_arquivos_gerais",
+            validacao="separação por Emp/Obra",
+            mensagem=(
+                "Não foi possível separar os arquivos gerais por Emp/Obra com pares válidos "
+                "entre Receber e Recebidos."
+            ),
+            campo_ou_aba="arquivos gerais",
+            contexto={
+                "Dados_Auxiliares": (
+                    f"Emp/Obra em Receber={sorted(grupos_r.keys())} | "
+                    f"Emp/Obra em Recebidos={sorted(grupos_p.keys())}"
+                )
+            },
+        )
+
+    temporarios: List[str] = []
+    try:
+        cr: List[str] = []
+        cp: List[str] = []
+        for k in chaves:
+            pr = _escrever_bloco_temp_txt(f"geral_rec_{k}", grupos_r[k], tipo="RECEBER")
+            pp = _escrever_bloco_temp_txt(f"geral_reb_{k}", grupos_p[k], tipo="RECEBIDOS")
+            temporarios.extend([pr, pp])
+            cr.append(pr)
+            cp.append(pp)
+        return processar_lote_uau(
+            cr,
+            cp,
+            caminho_saida_base,
+            MODO_POR_EMPREENDIMENTO,
+            caminhos_estoque=caminhos_estoque,
+            progresso_cb=progresso_cb,
+            pular_validacao_entrada=True,
+        )
+    finally:
+        for p in temporarios:
+            _remover_seguro(p)
+
+
+def _normalizar_modo_entrada(modo_geracao: str | None) -> str:
+    modo = str(modo_geracao or "").strip().upper()
+    if not modo:
+        return ""
+    if modo in _ALIASES_MODO_POR_EMPREENDIMENTO:
+        return MODO_POR_EMPREENDIMENTO
+    if modo in _ALIASES_MODO_ARQUIVOS_GERAIS:
+        return MODO_ARQUIVOS_GERAIS
+    return modo
 
 
 def _data_base_de_primeiro_xlsx_motor(caminho: str):
@@ -754,6 +1004,7 @@ def processar_lote_uau(
     modo_geracao: str,
     caminhos_estoque: Sequence[str] | None = None,
     progresso_cb=None,
+    pular_validacao_entrada: bool = False,
 ) -> Tuple[Tuple[str, str], float]:
     """
     Entrada: listas de caminhos absolutos já salvos em disco.
@@ -816,10 +1067,11 @@ def processar_lote_uau(
     pasta_temp_local = os.path.join(pasta_saida, "_tmp_lote_uau")
     os.makedirs(pasta_temp_local, exist_ok=True)
 
-    for p in cr:
-        _validar_tipo_arquivo(p, "RECEBER", "Contas a Receber")
-    for p in cp:
-        _validar_tipo_arquivo(p, "RECEBIDOS", "Contas Recebidas")
+    if not pular_validacao_entrada:
+        for p in cr:
+            _validar_tipo_arquivo(p, "RECEBER", "Contas a Receber")
+        for p in cp:
+            _validar_tipo_arquivo(p, "RECEBIDOS", "Contas Recebidas")
 
     grupos_r: Dict[str, List[str]] = {}
     for p in cr:
@@ -909,7 +1161,9 @@ def processar_lote_uau(
             tempo_total_decorrido = max(0.0, time.perf_counter() - t0)
             lista_r = sorted(grupos_r[chave])
             lista_p = sorted(grupos_p[chave])
-            sigla = _sigla_curta_do_caminho(lista_r[0])
+            sigla = _sigla_canonica_para_saida(str(chave)) or _sigla_canonica_para_saida(
+                _sigla_curta_do_caminho(lista_r[0])
+            )
             nome_aba_consolidado = _titulo_aba_consolidado_carteiras_geral(sigla)
             _emitir_progresso(
                 status="processando",
@@ -1225,7 +1479,7 @@ def processar_entrada_simples_ou_lote(
     """
     cr = [p for p in caminhos_receber if p]
     cp = [p for p in caminhos_recebidos if p]
-    modo = (modo_geracao or "").strip()
+    modo = _normalizar_modo_entrada(modo_geracao)
     if len(cr) == 1 and len(cp) == 1 and not modo:
         tmp_est_par: List[str] = []
         try:
@@ -1248,13 +1502,31 @@ def processar_entrada_simples_ou_lote(
         finally:
             for p in tmp_est_par:
                 _remover_seguro(p)
-    if len(cr) == 1 and len(cp) == 1 and modo:
-        # Um par explícito com modo: usa o fluxo de lote POR_EMPREENDIMENTO.
+    # Caminho B (novo): ingestão por arquivos gerais, depois delega ao pipeline homologado de lote.
+    if len(cr) == 1 and len(cp) == 1 and modo == MODO_ARQUIVOS_GERAIS:
+        return processar_lote_arquivos_gerais(
+            cr[0],
+            cp[0],
+            caminho_saida_base,
+            caminhos_estoque=caminhos_estoque,
+            progresso_cb=progresso_cb,
+        )
+    # Caminho A (antigo/homologado): lote por empreendimento, sem alterações de regra financeira/layout.
+    if len(cr) == 1 and len(cp) == 1 and modo == MODO_POR_EMPREENDIMENTO:
         return processar_lote_uau(
             cr,
             cp,
             caminho_saida_base,
-            modo,
+            MODO_POR_EMPREENDIMENTO,
+            caminhos_estoque=caminhos_estoque,
+            progresso_cb=progresso_cb,
+        )
+    if len(cr) >= 1 and len(cp) >= 1 and modo == MODO_POR_EMPREENDIMENTO:
+        return processar_lote_uau(
+            cr,
+            cp,
+            caminho_saida_base,
+            MODO_POR_EMPREENDIMENTO,
             caminhos_estoque=caminhos_estoque,
             progresso_cb=progresso_cb,
         )
@@ -1267,13 +1539,15 @@ def processar_entrada_simples_ou_lote(
                 mensagem="Com vários arquivos, selecione o modo: Por empreendimento.",
                 campo_ou_aba="modo_geracao",
             )
-        return processar_lote_uau(
-            cr,
-            cp,
-            caminho_saida_base,
-            modo,
-            caminhos_estoque=caminhos_estoque,
-            progresso_cb=progresso_cb,
+        raise ProcessamentoUAUErro(
+            etapa="validação",
+            funcao="processar_entrada_simples_ou_lote",
+            validacao="modo de geração",
+            mensagem=(
+                "Modo de geração inválido. Use Por empreendimento "
+                "(ou Arquivos gerais apenas com 1 Receber + 1 Recebidos)."
+            ),
+            campo_ou_aba="modo_geracao",
         )
     raise ProcessamentoUAUErro(
         etapa="validação",

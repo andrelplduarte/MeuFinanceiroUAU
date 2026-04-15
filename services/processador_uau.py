@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.utils.cell import quote_sheetname
@@ -64,7 +65,7 @@ NOME_ABA_RESUMO_GERAL = "RESUMO GERAL"
 # Chave: SIGLA (ex.: ALVLT) OU EMP/OBRA normalizado OU nome do empreendimento normalizado.
 # Valor: URL completa (https://...).
 MAPA_LINKS_DRIVE_EMPREENDIMENTO = {
-    "NVLOT": "https://drive.google.com/drive/folders/COLE_LINK_NVLOT",
+    "NVLOT": "",
     "LTMAG": "https://drive.google.com/drive/folders/1Jv7nUHigYLQyvDx_RsoBt1zX4R_adlrB",
     "SCPTO": "https://drive.google.com/drive/folders/1nOMBP8udfjtEokkHWub9G_5nrjwIoizs",
     "SCPTI": "https://drive.google.com/drive/folders/1iDISqG4mQLIfcUrf3ZBRumJLgynI4T3a",
@@ -72,15 +73,15 @@ MAPA_LINKS_DRIVE_EMPREENDIMENTO = {
     "VROLT": "https://drive.google.com/drive/folders/1KphscK3Kv3tp_HC-FzVvjLgLDaL_Z4kB",
     "ALVLT": "https://drive.google.com/drive/folders/1cPDgewWBUiWzRl_l5g0zHMKnIIXuoDYs",
     "LTMON": "https://drive.google.com/drive/folders/1s8xmoz8G9ByTOqCQzcOEhN-LVfst0APH",
-    "RVERD": "https://drive.google.com/drive/folders/COLE_LINK_RVERD",
+    "RVERD": "",
     "LTVIL": "https://drive.google.com/drive/folders/1csTlqosfRlf6W1-jZRfgxRq1sSt_f5Ik",
     "LTMIN": "https://drive.google.com/drive/folders/1ZC2UAr5Cj8VIwB9MQ1le4OfObdEDUPhe",
-    "SCPGO": "https://drive.google.com/drive/folders/COLE_LINK_SCPGO",
+    "SCPGO": "",
     "ARAHF": "https://drive.google.com/drive/folders/1AcP51anpZX8l3WwnTkKYZgOU7JwGz-Es",
     "BVGWH": "https://drive.google.com/drive/folders/1M8FaqJM5ps405xB9pKrOskzsWiahXLXb",
-    "MANHA": "https://drive.google.com/drive/folders/COLE_LINK_MANHA",
-    "MONTB": "https://drive.google.com/drive/folders/COLE_LINK_MONTB",
-    "LIFE": "https://drive.google.com/drive/folders/COLE_LINK_LIFE",
+    "MANHA": "",
+    "MONTB": "",
+    "LIFE": "",
 }
 
 # De-para oficial de empreendimento (fonte única para exibição no topo e colunas).
@@ -5238,19 +5239,21 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
 
     # M1:M6 e N1:N6: contorno branco #FFFFFF + divisórias horizontais (painel estoque, anexo 5).
     _bd_ext_branco = Side(style="thin", color="FFFFFF")
+    _bd_ext_preto = Side(style="medium", color="000000")
     for r in range(1, 7):
+        ws[f"B{r}"].fill = PatternFill("solid", fgColor="BFBFBF")
         ws[f"M{r}"].border = Border(
             left=_bd_ext_branco,
             right=_bd_ext_branco,
             top=_bd_ext_branco if r == 1 else Side(style=None),
             bottom=_bd_ext_branco,
         )
-        ws[f"N{r}"].fill = PatternFill("solid", fgColor=branco)
+        ws[f"N{r}"].fill = PatternFill("solid", fgColor="BFBFBF")
         ws[f"N{r}"].border = Border(
-            left=_bd_ext_branco,
-            right=_bd_ext_branco,
-            top=_bd_ext_branco if r == 1 else Side(style=None),
-            bottom=_bd_ext_branco,
+            left=_bd_ext_preto,
+            right=_bd_ext_preto,
+            top=_bd_ext_preto if r == 1 else Side(style=None),
+            bottom=_bd_ext_preto if r == 6 else Side(style=None),
         )
 
     ws["B4"].number_format = "R$ #,##0.00"
@@ -5263,7 +5266,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
         ("F7:G7", "INADIMPLÊNCIA", vermelho, branco),
         ("H7:I7", "A VENCER", azul_claro, branco),
         ("J7:M7", "INDICADORES", amarelo, preto),
-        ("N7:N7", "STATUS GERAL", azul_escuro, branco),
+        ("N7:N7", "INFORMAÇÕES", azul_escuro, branco),
     ]
     for faixa, titulo, cor, cor_fonte in blocos_rg:
         ws.merge_cells(faixa)
@@ -5294,6 +5297,8 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
             cell = ws.cell(row=8, column=ci)
             if cell.value is not None:
                 cell.value = _padronizar_rotulo_coluna_exibicao(str(cell.value))
+            if ci == column_index_from_string("N"):
+                cell.value = "CLASSIFICAÇÃO"
             cell.font = Font(name="Calibri", size=10, bold=True, color=fc)
             cell.fill = PatternFill("solid", fgColor=fg)
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -5324,7 +5329,9 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
             cell.alignment = align_centro
             cell.border = border_data
             if linha % 2 == 0:
-                cell.fill = PatternFill("solid", fgColor="F8FBFF")
+                cell.fill = PatternFill("solid", fgColor="F2F2F2")
+            else:
+                cell.fill = PatternFill("solid", fgColor="FFFFFF")
             if letter in colunas_moeda:
                 cell.number_format = "R$ #,##0.00"
             elif letter in colunas_inteiras:
@@ -5341,6 +5348,39 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                 top=cell.border.top,
                 bottom=cell.border.bottom,
             )
+
+    # Destaque visual solicitado: coluna % INADIMPLÊNCIA (L) e CLASSIFICAÇÃO (N)
+    # com a mesma paleta do status (alto/médio/baixo).
+    if max_row_data >= 9:
+        fill_alto = PatternFill("solid", fgColor="FFC7CE")
+        fill_medio = PatternFill("solid", fgColor="FFF2CC")
+        fill_baixo = PatternFill("solid", fgColor="9FD9E8")
+
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            FormulaRule(formula=["$L9>=0.15"], stopIfTrue=True, fill=fill_alto),
+        )
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            FormulaRule(formula=["AND($L9>=0.05,$L9<0.15)"], stopIfTrue=True, fill=fill_medio),
+        )
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            FormulaRule(formula=['AND($L9<0.05,$L9<>"")'], stopIfTrue=True, fill=fill_baixo),
+        )
+
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['OR(UPPER($N9)="ALTO",UPPER($N9)="ALTA")'], stopIfTrue=True, fill=fill_alto),
+        )
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['OR(UPPER($N9)="MÉDIO",UPPER($N9)="MEDIO")'], stopIfTrue=True, fill=fill_medio),
+        )
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['UPPER($N9)="BAIXO"'], stopIfTrue=True, fill=fill_baixo),
+        )
 
     def _norm_txt_rg(valor) -> str:
         s = str(valor or "").strip().upper()
@@ -5976,19 +6016,21 @@ def aplicar_estilo_excel(
 
         # Z1:Z6 e AA1:AA6: bordas brancas iguais ao painel M/N do resumo (contorno + divisórias horizontais).
         _bd_w_panel = Side(style="thin", color="FFFFFF")
+        _bd_ext_preto = Side(style="medium", color="000000")
         for rr in range(1, 7):
+            ws[f"B{rr}"].fill = PatternFill("solid", fgColor="BFBFBF")
             ws[f"Z{rr}"].border = Border(
                 left=borda_media_preta,
                 right=_bd_w_panel,
                 top=borda_media_preta if rr == 1 else _bd_w_panel,
                 bottom=_bd_w_panel,
             )
-            ws[f"AA{rr}"].fill = PatternFill("solid", fgColor=branco)
+            ws[f"AA{rr}"].fill = PatternFill("solid", fgColor="BFBFBF")
             ws[f"AA{rr}"].border = Border(
-                left=_bd_w_panel,
-                right=_bd_w_panel,
-                top=_bd_w_panel if rr == 1 else Side(style=None),
-                bottom=_bd_w_panel,
+                left=_bd_ext_preto,
+                right=_bd_ext_preto,
+                top=_bd_ext_preto if rr == 1 else Side(style=None),
+                bottom=_bd_ext_preto if rr == 6 else Side(style=None),
             )
 
         ws["B4"].number_format = 'R$ #,##0.00'

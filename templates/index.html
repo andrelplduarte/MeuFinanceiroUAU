@@ -695,6 +695,174 @@
             line-height: 1.45;
         }
 
+        .panel-header-top {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .panel-header-main {
+            min-width: 0;
+        }
+
+        .panel-header-side {
+            width: 100%;
+        }
+
+        .panel-header-controls {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            width: 100%;
+        }
+
+        @media (min-width: 980px) {
+            .panel-header-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .panel-actions-right {
+            margin-top: 4px;
+            padding: 10px 12px;
+            border-radius: var(--radius-xs);
+            border: 1px solid rgba(77, 142, 255, 0.34);
+            background: linear-gradient(160deg, rgba(77, 142, 255, 0.12), rgba(26, 30, 44, 0.92));
+            box-shadow: inset 0 0 0 1px rgba(77, 142, 255, 0.11), 0 8px 18px rgba(0, 0, 0, 0.24);
+        }
+
+        .cache-actions-label {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #cfe2ff;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .cache-actions-buttons {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .cache-btn {
+            width: 100%;
+            justify-content: center;
+            padding: 10px 12px;
+            border-radius: var(--radius-xs);
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .cache-btn-normal {
+            color: #e6f0ff;
+            border-color: rgba(112, 170, 255, 0.55) !important;
+            background: linear-gradient(180deg, rgba(77, 142, 255, 0.24), rgba(77, 142, 255, 0.1));
+            box-shadow: 0 8px 16px rgba(30, 85, 165, 0.24);
+        }
+
+        .cache-btn-normal:hover {
+            border-color: rgba(152, 196, 255, 0.82) !important;
+            background: linear-gradient(180deg, rgba(101, 159, 255, 0.33), rgba(77, 142, 255, 0.14));
+            box-shadow: 0 10px 20px rgba(44, 111, 203, 0.28);
+        }
+
+        .cache-btn-force {
+            color: #fff0dc;
+            border-color: rgba(255, 191, 122, 0.65) !important;
+            background: linear-gradient(180deg, rgba(245, 153, 73, 0.26), rgba(245, 153, 73, 0.11));
+            box-shadow: 0 8px 16px rgba(145, 88, 34, 0.24);
+        }
+
+        .cache-btn-force:hover {
+            border-color: rgba(255, 210, 161, 0.9) !important;
+            background: linear-gradient(180deg, rgba(248, 171, 102, 0.33), rgba(245, 153, 73, 0.16));
+            box-shadow: 0 10px 20px rgba(145, 88, 34, 0.3);
+        }
+
+        .mode-entry-box {
+            margin-top: 4px;
+            padding: 10px 12px;
+            border-radius: var(--radius-xs);
+            border: 1px solid rgba(212, 36, 62, 0.35);
+            background: linear-gradient(160deg, rgba(212, 36, 62, 0.11), rgba(26, 30, 44, 0.92));
+            box-shadow: inset 0 0 0 1px rgba(212, 36, 62, 0.12), 0 8px 18px rgba(0, 0, 0, 0.24);
+        }
+
+        .mode-entry-label {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #ffd3d8;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .mode-entry-help {
+            margin-top: 6px;
+            font-size: 0.78rem;
+            color: #c6ccda;
+            line-height: 1.35;
+        }
+
+        .mode-entry-select {
+            width: 100%;
+            min-width: 250px;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding: 10px 38px 10px 12px;
+            border-radius: var(--radius-xs);
+            border: 1px solid rgba(212, 36, 62, 0.42);
+            background:
+                linear-gradient(45deg, transparent 50%, #ffb0ba 50%) calc(100% - 16px) calc(50% - 2px) / 7px 7px no-repeat,
+                linear-gradient(135deg, #ffb0ba 50%, transparent 50%) calc(100% - 11px) calc(50% - 2px) / 7px 7px no-repeat,
+                linear-gradient(180deg, rgba(212, 36, 62, 0.2), rgba(26, 30, 44, 0.95));
+            color: #f6f8ff;
+            font-size: 0.86rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+        }
+
+        .mode-entry-select:hover {
+            border-color: rgba(255, 160, 172, 0.78);
+            box-shadow: 0 0 0 1px rgba(212, 36, 62, 0.24), 0 10px 18px rgba(212, 36, 62, 0.16);
+        }
+
+        .mode-entry-select:focus {
+            outline: none;
+            border-color: rgba(255, 174, 186, 0.9);
+            box-shadow: 0 0 0 2px rgba(212, 36, 62, 0.26);
+        }
+
+        .mode-entry-select option {
+            background: #141925;
+            color: #f3f6ff;
+        }
+
+        .cache-entry-select {
+            border-color: rgba(77, 142, 255, 0.45);
+            background:
+                linear-gradient(45deg, transparent 50%, #9bc2ff 50%) calc(100% - 16px) calc(50% - 2px) / 7px 7px no-repeat,
+                linear-gradient(135deg, #9bc2ff 50%, transparent 50%) calc(100% - 11px) calc(50% - 2px) / 7px 7px no-repeat,
+                linear-gradient(180deg, rgba(77, 142, 255, 0.22), rgba(26, 30, 44, 0.95));
+        }
+
+        .cache-entry-select:hover {
+            border-color: rgba(155, 194, 255, 0.85);
+            box-shadow: 0 0 0 1px rgba(77, 142, 255, 0.22), 0 10px 18px rgba(77, 142, 255, 0.18);
+        }
+
+        .cache-entry-select:focus {
+            outline: none;
+            border-color: rgba(176, 209, 255, 0.9);
+            box-shadow: 0 0 0 2px rgba(77, 142, 255, 0.26);
+        }
+
         .upload-actions {
             display: flex;
             flex-wrap: wrap;
@@ -1975,40 +2143,66 @@
 
         <form id="form-processamento" method="POST" enctype="multipart/form-data" class="panel">
             <div class="panel-header">
-                <h2>
-                    <span class="icon-wrap" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    </span>
-                    Entrada de arquivos
-                </h2>
-                <p class="hint">Selecione um ou mais arquivos <strong>.txt</strong> em cada grupo. Não misture Receber com Recebidos.</p>
-                <p class="hint" style="margin-top:10px;">
-                    <a href="{{ url_for('limpar_lote') }}" style="color:#ff9ca8;text-decoration:underline;">Limpar todo o lote anexado agora</a>
-                </p>
-                <button
-                    type="submit"
-                    formnovalidate
-                    formaction="{{ url_for('limpar_cache') }}"
-                    formmethod="post"
-                    class="btn-file-secondary"
-                    style="margin-top:8px;border-color: rgba(240, 91, 77, 0.45); color:#ffd2ce;"
-                    onclick="return confirm('Isso vai limpar uploads, outputs e progresso. Deseja continuar?');"
-                >
-                    Limpar cache do sistema
-                </button>
-                <button
-                    type="submit"
-                    name="forcar_limpeza"
-                    value="1"
-                    formnovalidate
-                    formaction="{{ url_for('limpar_cache') }}"
-                    formmethod="post"
-                    class="btn-file-secondary"
-                    style="margin-top:8px;border-color: rgba(255, 170, 77, 0.55); color:#ffe1bf;"
-                    onclick="return confirm('Forçar limpeza vai remover uploads, outputs e progresso mesmo com execução ativa. Deseja continuar?');"
-                >
-                    Forçar limpeza do cache
-                </button>
+                <div class="panel-header-top">
+                    <div class="panel-header-main">
+                        <h2>
+                            <span class="icon-wrap" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                            </span>
+                            Entrada de arquivo
+                        </h2>
+                        <p class="hint">Selecione um ou mais arquivos <strong>.txt</strong> em cada grupo. Não misture Receber com Recebidos.</p>
+                    </div>
+                    <div class="panel-header-controls">
+                        <div class="panel-header-side">
+                            <div class="mode-entry-box">
+                                <label class="mode-entry-label" for="modo_geracao">Modo de entrada</label>
+                                <select id="modo_geracao" name="modo_geracao" class="mode-entry-select">
+                                    <option value="POR_EMPREENDIMENTO" selected>Por empreendimento</option>
+                                    <option value="ARQUIVOS_GERAIS">Arquivos gerais (2 arquivos)</option>
+                                </select>
+                                <div class="mode-entry-help">Use este seletor para alternar entre arquivos separados por empreendimento ou 2 arquivos gerais.</div>
+                            </div>
+                        </div>
+                        <div class="panel-header-side">
+                            <div class="panel-actions-right">
+                                <span class="cache-actions-label">Limpeza de cache</span>
+                                <select id="cache_action_select" class="mode-entry-select cache-entry-select">
+                                    <option value="">Selecionar ação</option>
+                                    <option value="normal">Limpar cache do sistema</option>
+                                    <option value="forcar">Forçar limpeza do cache</option>
+                                </select>
+                                <div class="mode-entry-help">Clique no seletor e escolha a ação de limpeza que deseja executar.</div>
+                                <div style="display:none;">
+                                    <button
+                                        id="btn-cache-normal"
+                                        type="submit"
+                                        formnovalidate
+                                        formaction="{{ url_for('limpar_cache') }}"
+                                        formmethod="post"
+                                        class="btn-file-secondary cache-btn cache-btn-normal"
+                                        onclick="return confirm('Isso vai limpar uploads, outputs e progresso. Deseja continuar?');"
+                                    >
+                                        Limpar cache do sistema
+                                    </button>
+                                    <button
+                                        id="btn-cache-force"
+                                        type="submit"
+                                        name="forcar_limpeza"
+                                        value="1"
+                                        formnovalidate
+                                        formaction="{{ url_for('limpar_cache') }}"
+                                        formmethod="post"
+                                        class="btn-file-secondary cache-btn cache-btn-force"
+                                        onclick="return confirm('Forçar limpeza vai remover uploads, outputs e progresso mesmo com execução ativa. Deseja continuar?');"
+                                    >
+                                        Forçar limpeza do cache
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="panel-body">
                 <div class="grid-2">
@@ -2124,7 +2318,6 @@
                     </div>
                 </div>
 
-                <input type="hidden" name="modo_geracao" value="POR_EMPREENDIMENTO" />
                 <input type="hidden" name="process_token" id="process-token" value="{{ process_token|default('') }}" />
 
                 <button id="botao-gerar" type="submit" class="btn-primary" name="acao" value="processar">Gerar planilha</button>
@@ -2691,6 +2884,22 @@
                     form.submit();
                 });
             });
+
+            var cacheActionSelect = document.getElementById("cache_action_select");
+            var btnCacheNormal = document.getElementById("btn-cache-normal");
+            var btnCacheForce = document.getElementById("btn-cache-force");
+            if (cacheActionSelect) {
+                cacheActionSelect.addEventListener("change", function () {
+                    var acao = String(cacheActionSelect.value || "").trim();
+                    if (!acao) return;
+                    if (acao === "normal" && btnCacheNormal) {
+                        btnCacheNormal.click();
+                    } else if (acao === "forcar" && btnCacheForce) {
+                        btnCacheForce.click();
+                    }
+                    cacheActionSelect.value = "";
+                });
+            }
 
             function atualizarContagens() {
                 var nr = inpR && inpR.files ? inpR.files.length : 0;
