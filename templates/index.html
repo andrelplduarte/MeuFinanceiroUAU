@@ -1369,10 +1369,35 @@
         }
 
         .monitor-timer-wrap {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
+            display: grid;
+            gap: 10px;
+            width: min(100%, 430px);
+        }
+
+        .monitor-timers-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+
+        @media (max-width: 680px) {
+            .monitor-timers-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .monitor-timer-card {
+            min-width: 0;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card-inner);
+            border: 1px solid var(--border);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        .monitor-timer-card--estimated {
+            border-color: rgba(118, 201, 255, 0.22);
         }
 
         .monitor-timer-label {
@@ -1384,30 +1409,35 @@
         }
 
         .monitor .tempo,
-        #contador-tempo {
-            font-size: 2.25rem;
+        #contador-tempo,
+        #contador-estimado {
+            display: block;
+            margin-top: 6px;
+            font-size: 2rem;
             font-weight: 800;
             font-variant-numeric: tabular-nums;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.02em;
             line-height: 1;
-            padding: 10px 18px;
-            border-radius: var(--radius-sm);
-            background: var(--bg-card-inner);
-            border: 1px solid var(--border);
             font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
         }
-        #contador-estimado {
-            font-size: 2.1rem;
-            font-weight: 800;
-            font-variant-numeric: tabular-nums;
-            letter-spacing: 0.06em;
-            line-height: 1;
-            padding: 10px 18px;
-            border-radius: var(--radius-sm);
-            background: var(--bg-card-inner);
-            border: 1px solid var(--border);
-            font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
-            color: #76c9ff;
+        #contador-estimado { color: #76c9ff; }
+
+        .monitor-timer-sub {
+            margin-top: 8px;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            min-height: 2.2em;
+        }
+
+        .monitor-time-meta {
+            padding: 10px 12px;
+            border-radius: var(--radius-xs);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.45;
         }
 
         .tempo-otimo { color: #57d98d; }
@@ -1573,6 +1603,10 @@
             }
         }
 
+        .monitor-progress-meta--secondary {
+            margin-top: 12px;
+        }
+
         .monitor-chip {
             background: var(--bg-card-inner);
             border: 1px solid var(--border);
@@ -1607,6 +1641,19 @@
             line-height: 1.4;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        .monitor-download-chip {
+            border-color: rgba(46, 184, 114, 0.22);
+        }
+
+        .monitor-download-chip.is-blocked {
+            border-color: rgba(240, 208, 96, 0.18);
+        }
+
+        .monitor-download-chip.is-ready {
+            border-color: rgba(46, 184, 114, 0.32);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(46, 184, 114, 0.08);
         }
         .monitor.concluido {
             border-color: rgba(46, 184, 114, 0.45);
@@ -2333,10 +2380,19 @@
                 <div class="monitor-top">
                     <span class="monitor-label"><span class="monitor-pulse" aria-hidden="true"></span> Processando</span>
                     <div class="monitor-timer-wrap">
-                        <span class="monitor-timer-label">Tempo decorrido</span>
-                        <span id="contador-tempo" class="tempo-otimo">0:00</span>
-                        <span class="monitor-timer-label">Previsão</span>
-                        <span id="contador-estimado">0:00</span>
+                        <div class="monitor-timers-grid">
+                            <div class="monitor-timer-card">
+                                <span class="monitor-timer-label">Tempo decorrido</span>
+                                <span id="contador-tempo" class="tempo-otimo">0:00</span>
+                                <div id="monitor-fonte-tempo" class="monitor-timer-sub">Cronômetro local iniciado e sincronizado com o servidor quando houver avanço confirmado.</div>
+                            </div>
+                            <div class="monitor-timer-card monitor-timer-card--estimated">
+                                <span class="monitor-timer-label">Previsão restante</span>
+                                <span id="contador-estimado">0:00</span>
+                                <div id="monitor-fonte-estimativa" class="monitor-timer-sub">Estimativa inicial baseada no histórico local e no volume atual do lote.</div>
+                            </div>
+                        </div>
+                        <div id="monitor-time-meta" class="monitor-time-meta">Aguardando leitura do servidor para calibrar fase, progresso e previsão total.</div>
                     </div>
                 </div>
                 <div class="monitor-now-header">
@@ -2367,6 +2423,23 @@
                         <div class="monitor-chip">
                             <span class="monitor-chip-label">Status</span>
                             <span id="monitor-status-curto" class="monitor-chip-value">Em execução</span>
+                        </div>
+                    </div>
+                    <div class="monitor-progress-meta monitor-progress-meta--secondary">
+                        <div class="monitor-chip">
+                            <span class="monitor-chip-label">Fase</span>
+                            <span id="monitor-fase" class="monitor-chip-value">Preparando leitura e validação inicial</span>
+                            <div class="monitor-chip-sub">Leitura visual do estágio mais provável do lote</div>
+                        </div>
+                        <div class="monitor-chip">
+                            <span class="monitor-chip-label">Precisão do tempo</span>
+                            <span id="monitor-precisao-tempo" class="monitor-chip-value">Estimativa inicial</span>
+                            <div id="monitor-precisao-sub" class="monitor-chip-sub">Até o servidor responder, o painel usa histórico e volume do lote.</div>
+                        </div>
+                        <div id="monitor-download-chip" class="monitor-chip monitor-download-chip is-blocked">
+                            <span class="monitor-chip-label">Download</span>
+                            <span id="monitor-download-status" class="monitor-chip-value">Bloqueado até concluir</span>
+                            <div id="monitor-download-sub" class="monitor-chip-sub">O arquivo só aparece quando o Excel terminar de ser gravado.</div>
                         </div>
                     </div>
                 </div>
@@ -2568,6 +2641,15 @@
             var monitorItemAtual = document.getElementById("monitor-item-atual");
             var monitorItemAbas = document.getElementById("monitor-item-abas");
             var monitorStatusCurto = document.getElementById("monitor-status-curto");
+            var monitorFase = document.getElementById("monitor-fase");
+            var monitorPrecisaoTempo = document.getElementById("monitor-precisao-tempo");
+            var monitorPrecisaoSub = document.getElementById("monitor-precisao-sub");
+            var monitorDownloadStatus = document.getElementById("monitor-download-status");
+            var monitorDownloadSub = document.getElementById("monitor-download-sub");
+            var monitorDownloadChip = document.getElementById("monitor-download-chip");
+            var monitorFonteTempo = document.getElementById("monitor-fonte-tempo");
+            var monitorFonteEstimativa = document.getElementById("monitor-fonte-estimativa");
+            var monitorTimeMeta = document.getElementById("monitor-time-meta");
             var monitorProgressTrack = monitor ? monitor.querySelector(".monitor-progress-track") : null;
             var runtimeMeta = document.getElementById("runtime-meta");
             var processTokenInput = document.getElementById("process-token");
@@ -2929,7 +3011,7 @@
 
             function atualizarFaixa(segundos) {
                 contador.classList.remove("tempo-otimo", "tempo-bom", "tempo-atencao", "tempo-critico");
-                statusEl.textContent = faseEstimada(segundos);
+                if (monitorFase) monitorFase.textContent = faseEstimada(segundos);
                 var base = estimativaAtualSegundos > 0 ? estimativaAtualSegundos : 180;
                 if (segundos <= base * 0.55) {
                     contador.classList.add("tempo-otimo");
@@ -2952,6 +3034,60 @@
                     if (monitorLabel) monitorLabel.style.color = "#ff8a7a";
                     if (monitorPulse) monitorPulse.style.background = "#ff8a7a";
                 }
+            }
+
+            function atualizarMetaTempo(segundos, totalSegundos, restanteSegundos) {
+                if (!monitorTimeMeta) return;
+                var partes = [];
+                partes.push("Decorrido: " + formatarMmSs(segundos));
+                if (Number(totalSegundos || 0) > 0) {
+                    partes.push("Previsão total: ~" + formatarMmSs(totalSegundos));
+                }
+                if (Number(restanteSegundos || 0) >= 0) {
+                    partes.push("Restante: " + formatarMmSs(restanteSegundos));
+                }
+                monitorTimeMeta.textContent = partes.join(" · ");
+            }
+
+            function atualizarPrecisaoTempo(status, realAtivo) {
+                if (!monitorPrecisaoTempo || !monitorPrecisaoSub) return;
+                if (status === "concluido") {
+                    monitorPrecisaoTempo.textContent = "Tempo final fechado";
+                    monitorPrecisaoSub.textContent = "Servidor confirmou o encerramento e a gravação do arquivo.";
+                    return;
+                }
+                if (status === "erro") {
+                    monitorPrecisaoTempo.textContent = "Execução interrompida";
+                    monitorPrecisaoSub.textContent = "O relógio para de ser referência quando o lote termina com erro.";
+                    return;
+                }
+                if (realAtivo) {
+                    monitorPrecisaoTempo.textContent = "Tempo real sincronizado";
+                    monitorPrecisaoSub.textContent = "Cronômetro reconciliado com o backend a cada atualização de progresso.";
+                    return;
+                }
+                monitorPrecisaoTempo.textContent = "Estimativa inicial";
+                monitorPrecisaoSub.textContent = "Enquanto o servidor não retorna dados, o painel usa histórico e volume atual do lote.";
+            }
+
+            function atualizarDownloadMonitor(status) {
+                if (!monitorDownloadStatus || !monitorDownloadSub || !monitorDownloadChip) return;
+                monitorDownloadChip.classList.remove("is-blocked", "is-ready");
+                if (status === "concluido") {
+                    monitorDownloadStatus.textContent = "Liberado para baixar";
+                    monitorDownloadSub.textContent = "O servidor terminou a gravação. O botão de download aparece no bloco verde abaixo.";
+                    monitorDownloadChip.classList.add("is-ready");
+                    return;
+                }
+                if (status === "erro") {
+                    monitorDownloadStatus.textContent = "Sem arquivo liberado";
+                    monitorDownloadSub.textContent = "A execução encerrou com erro; não há download confiável para esta tentativa.";
+                    monitorDownloadChip.classList.add("is-blocked");
+                    return;
+                }
+                monitorDownloadStatus.textContent = "Bloqueado até concluir";
+                monitorDownloadSub.textContent = "O arquivo só é liberado depois que o Excel termina de ser montado e salvo no servidor.";
+                monitorDownloadChip.classList.add("is-blocked");
             }
 
             function clamp(num, min, max) {
@@ -3033,16 +3169,29 @@
                     monitorItemAtual.textContent = "Empreendimento " + atual + " de " + totalEmpreendimentos;
                 }
                 if (monitorStatusCurto) {
-                    monitorStatusCurto.textContent = percentual >= 85 ? "Finalizando lote" : "Em execução";
+                    monitorStatusCurto.textContent = percentual >= 85 ? "Finalizando lote" : "Estimativa em andamento";
                 }
                 if (monitorProgressTrack) {
                     monitorProgressTrack.setAttribute("aria-valuenow", String(percentual));
                 }
+                if (monitorItemAbas) {
+                    monitorItemAbas.textContent = "Aguardando retorno detalhado do servidor";
+                }
+                if (monitorFonteTempo) {
+                    monitorFonteTempo.textContent = "Cronômetro local ativo. Será recalibrado quando o backend confirmar avanço real.";
+                }
+                if (monitorFonteEstimativa) {
+                    monitorFonteEstimativa.textContent = "Previsão baseada no histórico local e no volume atual do lote anexado.";
+                }
+                atualizarPrecisaoTempo("processando", false);
+                atualizarDownloadMonitor("processando");
+                atualizarMetaTempo(segundos, estimativaTotalSegundos || estimativaAtualSegundos, Math.max(0, base - segundos));
             }
 
             function aplicarProgressoReal(data) {
                 progressoRealAtivo = true;
                 var tDec = Number(data.tempo_decorrido_segundos || 0);
+                var segParaDisplay = Math.max(0, Math.floor((Date.now() - inicioMs) / 1000));
                 if (tDec > 0) {
                     var srvSeg = Math.floor(tDec);
                     var localSeg = Math.max(0, Math.floor((Date.now() - inicioMs) / 1000));
@@ -3052,6 +3201,7 @@
                         if (contador) contador.textContent = formatarMmSs(srvSeg);
                     }
                     ultimoTempoServidorSeg = Math.max(ultimoTempoServidorSeg, srvSeg);
+                    segParaDisplay = Math.max(segParaDisplay, srvSeg);
                 }
                 var total = Math.max(1, Number(data.total_empreendimentos || 1));
                 var concluidos = clamp(Number(data.concluidos || 0), 0, total);
@@ -3084,14 +3234,34 @@
                 if (monitorStatusCurto) {
                     if (data.status === "concluido") monitorStatusCurto.textContent = "Concluído";
                     else if (data.status === "erro") monitorStatusCurto.textContent = "Erro";
-                    else monitorStatusCurto.textContent = "Em execução";
+                    else monitorStatusCurto.textContent = percentualInformado > 0 ? "Sincronizado com servidor" : "Em execução";
                 }
                 if (statusEl && data.mensagem) {
                     statusEl.textContent = String(data.mensagem);
                 }
+                if (monitorFase) {
+                    monitorFase.textContent = data.mensagem ? String(data.mensagem) : faseEstimada(segParaDisplay);
+                }
+                if (monitorFonteTempo) {
+                    monitorFonteTempo.textContent = tDec > 0
+                        ? "Tempo confirmado pelo backend e ajustado sem travar o relógio visual."
+                        : "Servidor ainda sem contador próprio; mantendo cronômetro local.";
+                }
+                if (monitorFonteEstimativa) {
+                    if (Number(data.estimativa_total_segundos || 0) > 0) {
+                        monitorFonteEstimativa.textContent = "Previsão refinada pelo servidor com base no ritmo atual do lote.";
+                    } else {
+                        monitorFonteEstimativa.textContent = "Previsão ainda apoiada no histórico local do navegador.";
+                    }
+                }
                 if (monitorProgressTrack) {
                     monitorProgressTrack.setAttribute("aria-valuenow", String(percentual));
                 }
+                var baseTotal = Number(data.estimativa_total_segundos || estimativaTotalSegundos || estimativaAtualSegundos || 0);
+                var restanteReal = Math.max(0, Math.floor(baseTotal - segParaDisplay));
+                atualizarMetaTempo(segParaDisplay, baseTotal, restanteReal);
+                atualizarPrecisaoTempo(String(data.status || "processando"), tDec > 0 || percentualInformado > 0);
+                atualizarDownloadMonitor(String(data.status || "processando"));
                 if (Array.isArray(data.itens_tempo) && data.itens_tempo.length) {
                     registrarTemposPorItem(data.itens_tempo);
                 }
@@ -3161,6 +3331,11 @@
                 estimativaTotalSegundos = estimativaAtualSegundos;
                 if (monitorEstimativa) monitorEstimativa.textContent = "";
                 if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(estimativaTotalSegundos || 0);
+                if (statusEl) statusEl.textContent = "Inicializando validações e leitura dos arquivos…";
+                if (monitorFase) monitorFase.textContent = "Preparando leitura e validação inicial";
+                atualizarPrecisaoTempo("processando", false);
+                atualizarDownloadMonitor("processando");
+                atualizarMetaTempo(baseSeg, estimativaTotalSegundos, Math.max(0, estimativaTotalSegundos - baseSeg));
                 atualizarResumoProgresso(baseSeg, totais.totalEmpreendimentos);
                 if (timerId) clearInterval(timerId);
                 timerId = setInterval(function () {
@@ -3170,6 +3345,7 @@
                     var restante = Math.max(0, Math.floor(baseRestante - seg));
                     if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(restante);
                     atualizarFaixa(seg);
+                    atualizarMetaTempo(seg, baseRestante, restante);
                     if (!progressoRealAtivo) {
                         atualizarResumoProgresso(seg, totais.totalEmpreendimentos);
                     }

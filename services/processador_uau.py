@@ -3285,6 +3285,43 @@ def ler_dataframe_consolidado_de_xlsx_motor(caminho_xlsx: str) -> pd.DataFrame:
         src_real = cols_up.get(src_up)
         if src_real is not None and dst not in df.columns:
             df = df.rename(columns={src_real: dst})
+    # Layout estilizado do consolidado usa alguns rótulos repetidos na linha 8.
+    # Quando isso ocorrer, preservamos o contrato do motor pela posição A:AA.
+    mapa_posicional = {
+        0: "Emp/Obra",
+        1: "Empreendimento",
+        2: "Venda",
+        3: "Cliente",
+        4: "Identificador",
+        5: "Status venda",
+        6: "Valor Da Parcela",
+        7: "Qtd.Parc.Total",
+        8: "Qtd.Parc.Paga",
+        9: "Vl.Pago",
+        10: "Qtd.Parc.Atrasada",
+        11: "Vl.Principal Atrasado",
+        12: "Vl.Correção",
+        13: "Vl.Juros",
+        14: "Vl.Multas",
+        15: "Vl.Correção Atraso",
+        16: "Vl.Principal (Encargos)",
+        17: "Qtd.Parc.A Vencer",
+        18: "Vl.Vencer",
+        19: "Vl.Carteira",
+        20: "% Pago",
+        21: "% Inadimplência",
+        22: "% A Vencer",
+        23: "DIA VENCIMENTO",
+        24: "Status Construção",
+        25: "Judicializado",
+        26: "APORTE",
+    }
+    colunas_essenciais = {"Emp/Obra", "Venda", "Qtd.Parc.Paga", "Qtd.Parc.A Vencer", "Vl.Vencer"}
+    if not colunas_essenciais.issubset(set(df.columns)) and len(df.columns) >= 27:
+        novos = []
+        for idx, col in enumerate(df.columns):
+            novos.append(mapa_posicional.get(idx, col))
+        df.columns = novos
     return df
 
 
@@ -4443,7 +4480,7 @@ def montar_consolidado(
         "Vl.Pago", "Qtd.Parc.Atrasada", "Vl.Principal Atrasado", "Vl.Correção",
         "Vl.Juros", "Vl.Multas", "Vl.Correção Atraso", "Vl.Principal (Encargos)",
         "Qtd.Parc.A Vencer", "Vl.Vencer", "Vl.Carteira", "% Pago",
-        "% Inadimplência", "% A Vencer", "DIA VENCIMENTO", "Status Construção", "APORTE",
+        "% Inadimplência", "% A Vencer", "DIA VENCIMENTO", "Status Construção", "Judicializado", "APORTE",
     ]
 
     # =====================================================
@@ -4776,7 +4813,7 @@ def montar_consolidado(
         if col not in consolidado.columns:
             consolidado[col] = 0 if col not in [
                 "Emp/Obra", "Empreendimento", "Venda", "Cliente", "Identificador",
-                "Status venda", "Status Construção", "APORTE"
+                "Status venda", "Status Construção", "Judicializado", "APORTE"
             ] else ""
 
     if not consolidado.empty and consolidado["Venda"].duplicated().any():
@@ -5090,6 +5127,7 @@ def _autoajustar_colunas_e_linhas(
     limite_coluna: int | None = None,
     max_scan_rows: int = 4000,
     modo_rapido: bool = False,
+    ajustar_altura_linhas: bool = True,
 ) -> None:
     """
     Autoajuste de colunas/linhas por conteúdo, preservando larguras fixas informadas.
@@ -5128,7 +5166,7 @@ def _autoajustar_colunas_e_linhas(
             ws.column_dimensions[letter].width = width
         else:
             ws.column_dimensions[letter].width = max(float(cur), float(width))
-    if modo_rapido:
+    if modo_rapido or not ajustar_altura_linhas:
         return
     # Altura de linhas apenas para dados longos (mantém cabeçalho estável).
     for row in range(data_start_row, scan_until + 1):
@@ -5176,7 +5214,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     borda_media_preta = Side(style="medium", color="000000")
     borda_fina_cinza = Side(style="thin", color="BFBFBF")
 
-    ws["A1"] = "RESUMO GERAL"
+    ws["A1"] = "EMPREENDIMENTO"
     ws["B1"] = "CART.GERAL"
     try:
         ws.unmerge_cells("C1:L6")
@@ -5198,7 +5236,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     # Rótulos alinhados ao modelo visual (fórmulas / referências de coluna inalteradas).
     ws["A3"] = "QTD. VENDAS"
     ws["B3"] = "=SUBTOTAL(109,C9:C1048576)"
-    ws["A4"] = "VL.CARTEIRA CART.TOTAL"
+    ws["A4"] = "VL.CART.TOTAL"
     ws["B4"] = "=SUBTOTAL(109,J9:J1048576)"
     ws["A5"] = "VL.INADIMPLÊNCIA CART.TOTAL"
     ws["B5"] = "=SUBTOTAL(109,G9:G1048576)"
@@ -5259,14 +5297,16 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     ws["B4"].number_format = "R$ #,##0.00"
     ws["B5"].number_format = "R$ #,##0.00"
     ws["B6"].number_format = "0.00%"
+    ws["A5"] = "VL.INADIM.CART.TOTAL"
+    ws["A6"] = "% INADIM.CART.TOTAL"
 
     blocos_rg = [
-        ("A7:C7", "DADOS", azul_escuro, branco),
-        ("D7:E7", "PAGO", verde, branco),
-        ("F7:G7", "INADIMPLÊNCIA", vermelho, branco),
-        ("H7:I7", "A VENCER", azul_claro, branco),
+        ("A7:C7", "DADOS CADASTRO", azul_escuro, branco),
+        ("D7:E7", "PAGO", verde, preto),
+        ("F7:G7", "INADIMPLÊNCIA", vermelho, preto),
+        ("H7:I7", "A VENCER", azul_claro, preto),
         ("J7:M7", "INDICADORES", amarelo, preto),
-        ("N7:N7", "INFORMAÇÕES", azul_escuro, branco),
+        ("N7:N7", "INFORMAÇÕES", "FFF2CC", preto),
     ]
     for faixa, titulo, cor, cor_fonte in blocos_rg:
         ws.merge_cells(faixa)
@@ -5284,13 +5324,29 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                     bottom=borda_fina_branca,
                 )
 
+    for merged_range in list(ws.merged_cells.ranges):
+        if str(merged_range) == "N7":
+            ws.merged_cells.ranges.remove(merged_range)
+
+    ws["F7"] = "INADIMPLENCIA"
+    ws["N7"] = "INFORMAÇÕES"
+    ws["N7"].fill = PatternFill("solid", fgColor="FFF2CC")
+    ws["N7"].font = Font(name="Calibri", size=10, bold=True, color=preto)
+    ws["N7"].alignment = Alignment(horizontal="center", vertical="center")
+    ws["N7"].border = Border(
+        left=borda_fina_branca,
+        right=borda_fina_branca,
+        top=borda_media_preta,
+        bottom=borda_fina_branca,
+    )
+
     hdr_seg_rg = [
         ("A", "C", azul_escuro, branco),
-        ("D", "E", verde, branco),
-        ("F", "G", vermelho, branco),
-        ("H", "I", azul_claro, branco),
+        ("D", "E", verde, preto),
+        ("F", "G", vermelho, preto),
+        ("H", "I", azul_claro, preto),
         ("J", "M", amarelo, preto),
-        ("N", "N", azul_escuro, branco),
+        ("N", "N", "FFF2CC", preto),
     ]
     for c0, c1, fg, fc in hdr_seg_rg:
         for ci in range(column_index_from_string(c0), column_index_from_string(c1) + 1):
@@ -5308,6 +5364,35 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                 top=borda_fina_branca,
                 bottom=borda_media_preta,
             )
+
+    headers_resumo = {
+        "A": "EMP/OBRA",
+        "B": "EMPREENDIMENTO",
+        "C": "QTD VENDAS",
+        "D": "QTD.PARC.",
+        "E": "VALOR",
+        "F": "QTD.PARC.",
+        "G": "VALOR",
+        "H": "QTD.PARC.",
+        "I": "VALOR",
+        "J": "VL.CARTEIRA",
+        "K": "% PAGO",
+        "L": "% INADIMPLENCIA",
+        "M": "% A VENCER",
+        "N": "CLASSIFICAÇÃO",
+    }
+    for col, titulo in headers_resumo.items():
+        ws[f"{col}8"] = titulo
+
+    ws["N8"].font = Font(name="Calibri", size=10, bold=True, color=preto)
+    ws["N8"].fill = PatternFill("solid", fgColor="FFF2CC")
+    ws["N8"].alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws["N8"].border = Border(
+        left=borda_fina_branca,
+        right=borda_fina_branca,
+        top=borda_fina_branca,
+        bottom=borda_media_preta,
+    )
 
     max_row_data = ws.max_row or 9
     max_col_data = ws.max_column or 14
@@ -5338,6 +5423,7 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
                 cell.number_format = "0"
             elif letter in colunas_percentuais:
                 cell.number_format = "0.00%"
+        ws.row_dimensions[linha].height = 15.0
 
     for col in ["C", "E", "G", "I", "M", "N"]:
         for linha in range(7, max_row_data + 1):
@@ -5352,21 +5438,22 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
     # Destaque visual solicitado: coluna % INADIMPLÊNCIA (L) e CLASSIFICAÇÃO (N)
     # com a mesma paleta do status (alto/médio/baixo).
     if max_row_data >= 9:
-        fill_alto = PatternFill("solid", fgColor="FFC7CE")
-        fill_medio = PatternFill("solid", fgColor="FFF2CC")
-        fill_baixo = PatternFill("solid", fgColor="9FD9E8")
+        fill_alto = PatternFill("solid", fgColor="FF5E5E")
+        fill_medio = PatternFill("solid", fgColor="FFFF00")
+        fill_baixo = PatternFill("solid", fgColor="00B0F0")
+        font_cond = Font(name="Calibri", size=10, bold=True, color=preto)
 
         ws.conditional_formatting.add(
             f"L9:L{max_row_data}",
-            FormulaRule(formula=["$L9>=0.15"], stopIfTrue=True, fill=fill_alto),
+            FormulaRule(formula=["$L9>=0.15"], stopIfTrue=True, fill=fill_alto, font=font_cond),
         )
         ws.conditional_formatting.add(
             f"L9:L{max_row_data}",
-            FormulaRule(formula=["AND($L9>=0.05,$L9<0.15)"], stopIfTrue=True, fill=fill_medio),
+            FormulaRule(formula=["AND($L9>=0.06,$L9<0.15)"], stopIfTrue=True, fill=fill_medio, font=font_cond),
         )
         ws.conditional_formatting.add(
             f"L9:L{max_row_data}",
-            FormulaRule(formula=['AND($L9<0.05,$L9<>"")'], stopIfTrue=True, fill=fill_baixo),
+            FormulaRule(formula=['AND($L9<0.06,$L9<>"")'], stopIfTrue=True, fill=fill_baixo, font=font_cond),
         )
 
         ws.conditional_formatting.add(
@@ -5381,6 +5468,19 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
             f"N9:N{max_row_data}",
             FormulaRule(formula=['UPPER($N9)="BAIXO"'], stopIfTrue=True, fill=fill_baixo),
         )
+
+        for linha in range(9, max_row_data + 1):
+            cell_n = ws[f"N{linha}"]
+            valor_n = str(cell_n.value or "").strip().upper()
+            if valor_n in {"ALTO", "ALTA"}:
+                cell_n.fill = fill_alto
+                cell_n.font = font_cond
+            elif valor_n in {"MÉDIO", "MEDIO"}:
+                cell_n.fill = fill_medio
+                cell_n.font = font_cond
+            elif valor_n == "BAIXO":
+                cell_n.fill = fill_baixo
+                cell_n.font = font_cond
 
     def _norm_txt_rg(valor) -> str:
         s = str(valor or "").strip().upper()
@@ -5463,25 +5563,31 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
 
     # Larguras do modelo de referência (Downloads\CARTEIRAS GERAL.xlsx), aba RESUMO GERAL.
     larguras_rg = {
-        "A": 29.0,
-        "B": 23.0,
-        "C": 15.77734375,
-        "D": 14.6640625,
+        "A": 19.453125,
+        "B": 27.0,
+        "C": 13.62109375,
+        "D": 11.68359375,
         "E": 17.6640625,
-        "F": 14.109375,
+        "F": 11.68359375,
         "G": 15.5546875,
-        "H": 14.109375,
+        "H": 11.68359375,
         "I": 16.5546875,
         "J": 17.6640625,
-        "K": 11.88671875,
-        "L": 20.21875,
+        "K": 9.62109375,
+        "L": 17.8515625,
         "M": 23.0,
         "N": 18.0,
     }
     for col, largura in larguras_rg.items():
         ws.column_dimensions[col].width = largura
 
-    _autoajustar_colunas_e_linhas(ws, header_row=8, data_start_row=9, fixed_widths={})
+    _autoajustar_colunas_e_linhas(
+        ws,
+        header_row=8,
+        data_start_row=9,
+        fixed_widths=larguras_rg,
+        ajustar_altura_linhas=False,
+    )
     ws.freeze_panes = "A9"
     ws.auto_filter.ref = "A8:N8"
 
@@ -5913,17 +6019,11 @@ def aplicar_estilo_excel(
         ws["B2"] = data_base.strftime("%d/%m/%Y") if data_base else ""
         ws["A3"] = "QTD. VENDAS"
         ws["B3"] = "=SUBTOTAL(103,C9:C1048576)"
-        if str(CARTEIRA_MODO_OFICIAL).strip().upper() == "POSICAO_TOTAL":
-            ws["A4"] = "VL.CARTEIRA (POSIÇÃO TOTAL)"
-        else:
-            ws["A4"] = "VL.CARTEIRA (SALDO EM ABERTO)"
+        ws["A4"] = "VL.CART.TOTAL"
         ws["B4"] = "=SUBTOTAL(109,T9:T1048576)"
-        ws["A5"] = "VL.TOTAL INADIMPLÊNCIA"
+        ws["A5"] = "VL.INADIM.CART.TOTAL"
         ws["B5"] = "=SUBTOTAL(109,Q9:Q1048576)"
-        if str(CARTEIRA_MODO_OFICIAL).strip().upper() == "POSICAO_TOTAL":
-            ws["A6"] = "% INADIMPLÊNCIA / CARTEIRA TOTAL"
-        else:
-            ws["A6"] = "% INADIMPLÊNCIA / SALDO ABERTO"
+        ws["A6"] = "% INADIM.CART.TOTAL"
         ws["B6"] = "=IFERROR(B5/B4,0)"
         k_es = _kpis_estoque_por_empreendimento(ws)
         ws["Z1"] = "PAINEL ESTOQUE"
@@ -6041,12 +6141,13 @@ def aplicar_estilo_excel(
 
         # Blocos linha 7 conforme modelo (A:AA): mesmas cores; colunas de dados abaixo permanecem as do motor.
         blocos = [
-            ("A7:G7", "DADOS CADASTRO", azul_escuro, branco),
-            ("H7:K7", "PAGO", verde, branco),
-            ("L7:Q7", "INADIMPLÊNCIA", vermelho, branco),
-            ("R7:T7", "A VENCER", azul_claro, branco),
-            ("U7:X7", "INDICADORES", amarelo, preto),
-            ("Y7:AA7", "INFORMAÇÕES", azul_escuro, branco),
+            ("A7:F7", "DADOS CADASTRO", "10243F", branco),
+            ("G7:H7", "DADOS FINANCEIRO", "C5D9F1", preto),
+            ("I7:J7", "PAGO", "92D050", preto),
+            ("K7:Q7", "INADIMPLENCIA", "FF5E5E", preto),
+            ("R7:S7", "A VENCER", "00B0F0", preto),
+            ("T7:W7", "INDICADORES", "FFFF00", preto),
+            ("X7:AA7", "INFORMAÇÕES", "FFF2CC", preto),
         ]
 
         for faixa, titulo, cor, cor_fonte in blocos:
@@ -6066,19 +6167,48 @@ def aplicar_estilo_excel(
                         bottom=borda_fina_branca
                     )
 
+        titulos_linha_8 = {
+            "A": "EMP/OBRA",
+            "B": "EMPREENDIMENTO",
+            "C": "VENDA",
+            "D": "CLIENTE",
+            "E": "IDENTIFICADOR",
+            "F": "STATUS",
+            "G": "VL.PARCELA",
+            "H": "QTD.PARC.TOTAL",
+            "I": "QTD.PARC.",
+            "J": "VALOR",
+            "K": "QTD.PARC.",
+            "L": "VL.PRINCIPAL",
+            "M": "VL.CORREÇÃO",
+            "N": "VL.JUROS",
+            "O": "VL.MULTAS",
+            "P": "VL.CORREÇÃO ATRASO",
+            "Q": "VL.PRINCIPAL (ENCARGOS)",
+            "R": "QTD.PARC.",
+            "S": "VALOR",
+            "T": "VL.CARTEIRA",
+            "U": "% PAGO",
+            "V": "% INADIMPLENCIA",
+            "W": "% A VENCER",
+            "X": "DIA VENCIMENTO",
+            "Y": "STATUS CONSTRUÇÃO",
+            "Z": "JUDICIALIZADO",
+            "AA": "APORTE",
+        }
         hdr_seg_cons = [
-            ("A", "G", azul_escuro, branco),
-            ("H", "K", verde, branco),
-            ("L", "Q", vermelho, branco),
-            ("R", "T", azul_claro, branco),
-            ("U", "X", amarelo, preto),
-            ("Y", "AA", azul_escuro, branco),
+            ("A", "F", "10243F", branco),
+            ("G", "H", "C5D9F1", preto),
+            ("I", "J", "92D050", preto),
+            ("K", "Q", "FF5E5E", preto),
+            ("R", "S", "00B0F0", preto),
+            ("T", "W", "FFFF00", preto),
+            ("X", "AA", "FFF2CC", preto),
         ]
         for c0, c1, fg, fc in hdr_seg_cons:
             for ci in range(column_index_from_string(c0), column_index_from_string(c1) + 1):
                 cell = ws.cell(row=8, column=ci)
-                if cell.value is not None:
-                    cell.value = _padronizar_rotulo_coluna_exibicao(str(cell.value))
+                cell.value = titulos_linha_8.get(get_column_letter(ci), cell.value)
                 cell.font = Font(name="Calibri", size=10, bold=True, color=fc)
                 cell.fill = PatternFill("solid", fgColor=fg)
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -6095,11 +6225,13 @@ def aplicar_estilo_excel(
 
         max_row_data = ws.max_row
         max_col_data = ws.max_column
+        max_col_grade_consolidado = min(max_col_data, column_index_from_string("AA"))
+        borda_fina_grade_consolidado = Side(style="thin", color="D8D8D8")
         border_data = Border(
-            left=borda_fina_cinza,
-            right=borda_fina_cinza,
-            top=borda_fina_cinza,
-            bottom=borda_fina_cinza,
+            left=borda_fina_grade_consolidado,
+            right=borda_fina_grade_consolidado,
+            top=borda_fina_grade_consolidado,
+            bottom=borda_fina_grade_consolidado,
         )
         align_centro_dados = Alignment(horizontal="center", vertical="center")
         fill_aporte_row = PatternFill("solid", fgColor="FFF2CC")
@@ -6114,15 +6246,16 @@ def aplicar_estilo_excel(
         fill_k_1 = PatternFill("solid", fgColor="D9D9D9")
         fill_k_0 = PatternFill("solid", fgColor="BDD7EE")
         font_f_bold_preto = Font(bold=True, color=preto)
+        formato_contabil = '_-R$ * #,##0.00_-;[Red]-R$ * #,##0.00_-;_-R$ * "-"??_-;_-@_-'
         colunas_moeda = frozenset({"G", "J", "L", "M", "N", "O", "P", "Q", "S", "T"})
         colunas_inteiras = frozenset({"H", "I", "K", "R", "X"})
         colunas_percentuais = frozenset({"U", "V", "W"})
 
-        col_letters_cache = [get_column_letter(col) for col in range(1, max_col_data + 1)]
+        col_letters_cache = [get_column_letter(col) for col in range(1, max_col_grade_consolidado + 1)]
         col_formato_cache = []
         for letter in col_letters_cache:
             if letter in colunas_moeda:
-                col_formato_cache.append('R$ #,##0.00')
+                col_formato_cache.append(formato_contabil)
             elif letter in colunas_inteiras:
                 col_formato_cache.append('0')
             elif letter in colunas_percentuais:
@@ -6146,34 +6279,35 @@ def aplicar_estilo_excel(
         colunas_fechamento_idx = {
             column_index_from_string(col)
             for col in ("G", "K", "Q", "T", "X", "AA")
-            if column_index_from_string(col) <= max_col_data
+            if column_index_from_string(col) <= max_col_grade_consolidado
         }
-        border_data_fechamento = Border(
-            left=borda_fina_cinza,
-            right=borda_media_preta,
-            top=borda_fina_cinza,
-            bottom=borda_fina_cinza,
-        )
+        border_data_fechamento = border_data
         total_linhas_cons = max(max_row_data - 8, 1)
         for idx_linha, row_cells in enumerate(
-            ws.iter_rows(min_row=9, max_row=max_row_data, min_col=1, max_col=max_col_data),
+            ws.iter_rows(min_row=9, max_row=max_row_data, min_col=1, max_col=max_col_grade_consolidado),
             start=1,
         ):
+            if not row_cells:
+                continue
             linha = row_cells[0].row
+            ws.row_dimensions[linha].height = 15.0
             pct = int((idx_linha / total_linhas_cons) * 100)
             _notify_timed(
                 "consolidado_linhas",
                 f"Consolidado: linhas {linha}/{max_row_data} ({pct}%)",
                 intervalo_segundos=1.2,
             )
-            status = str(row_cells[col_f_idx - 1].value or "").strip().upper()
+            cell_f = row_cells[col_f_idx - 1] if len(row_cells) >= col_f_idx else None
+            cell_k = row_cells[col_k_idx - 1] if len(row_cells) >= col_k_idx else None
+            cell_aporte = row_cells[col_aporte_num - 1] if (col_aporte_num and len(row_cells) >= col_aporte_num) else None
+            status = str((cell_f.value if cell_f is not None else "") or "").strip().upper()
             if status == "QUITADO":
                 fill_f = fill_f_quit
             elif status == "INADIMPLENTE":
                 fill_f = fill_f_inad
             else:
                 fill_f = fill_f_outros
-            valor = row_cells[col_k_idx - 1].value
+            valor = cell_k.value if cell_k is not None else 0
             try:
                 qtd = int(valor or 0)
             except Exception:
@@ -6187,7 +6321,7 @@ def aplicar_estilo_excel(
             else:
                 fill_k = fill_k_0
             aporte_sim = bool(
-                col_aporte_num and str(row_cells[col_aporte_num - 1].value or "").strip().upper() == "SIM"
+                cell_aporte is not None and str(cell_aporte.value or "").strip().upper() == "SIM"
             )
             for col, cell in enumerate(row_cells, start=1):
                 fmt = col_formato_cache[col - 1]
@@ -6195,7 +6329,7 @@ def aplicar_estilo_excel(
                     cell.number_format = fmt
                 if not modo_turbo_consolidado:
                     cell.alignment = align_centro_dados
-                    cell.border = border_data_fechamento if col in colunas_fechamento_idx else border_data
+                cell.border = border_data_fechamento if col in colunas_fechamento_idx else border_data
                 if col == col_f_idx:
                     cell.fill = fill_f
                 elif col == col_x_idx:
@@ -6209,50 +6343,69 @@ def aplicar_estilo_excel(
                         continue
                     cell.fill = fill_zebra_2 if (linha % 2 == 0) else fill_zebra_1
 
-            c_f = row_cells[col_f_idx - 1]
-            c_k = row_cells[col_k_idx - 1]
-            c_f.font = font_f_bold_preto
-            c_k.fill = fill_k
-            c_k.font = font_f_bold_preto
+            if cell_f is not None:
+                cell_f.font = font_f_bold_preto
+            if cell_k is not None:
+                cell_k.fill = fill_k
+                cell_k.font = font_f_bold_preto
 
-        # Larguras do modelo de referência (aba por empreendimento); reduz ####### em moeda/%.
+        # Larguras base do consolidado conforme referência; algumas colunas seguem autoajuste por conteúdo.
         larguras = {
-            "A": 28.88671875,
-            "B": 22.21875,
-            "C": 9.109375,
+            "A": 19.0,
+            "B": 24.0,
+            "C": 8.7,
             "D": 30.0,
-            "E": 12.5546875,
-            "F": 34.109375,
-            "G": 18.0,
-            "H": 20.6640625,
-            "I": 15.6640625,
-            "J": 15.77734375,
-            "K": 14.0,
-            "L": 21.0,
-            "M": 23.88671875,
-            "N": 19.88671875,
-            "O": 14.0,
-            "P": 13.0,
-            "Q": 24.0,
-            "R": 27.77734375,
-            "S": 19.5546875,
-            "T": 20.109375,
-            "U": 16.0,
-            "V": 12.0,
-            "W": 17.44140625,
-            "X": 16.21875,
-            "Y": 20.77734375,
-            "Z": 24.0,
-            "AA": 12.0,
+            "E": 13.0,
+            "F": 14.5,
+            "G": 14.0,
+            "H": 16.0,
+            "I": 11.0,
+            "J": 14.0,
+            "K": 11.0,
+            "L": 13.5,
+            "M": 13.0,
+            "N": 13.0,
+            "O": 13.0,
+            "P": 20.0,
+            "Q": 13.0,
+            "R": 11.0,
+            "S": 13.0,
+            "T": 14.0,
+            "U": 9.0,
+            "V": 17.2,
+            "W": 12.2,
+            "X": 13.0,
+            "Y": 21.9,
+            "Z": 13.0,
+            "AA": 18.3,
         }
 
         for col, largura in larguras.items():
             if column_index_from_string(col) <= max_col_data or col == "AA":
                 ws.column_dimensions[col].width = largura
 
+        ajustes_largura_por_aba = {
+            "CIDAN.CID.NOVA.ITP-PA": {
+                "M": 14.203125,
+                "N": 17.62109375,
+                "O": 13.5,
+                "Q": 28.421875,
+                "X": 20.7109375,
+            },
+            "NVLOT.NIL.VELOSO.RVD-GO": {
+                "N": 14.7109375,
+                "O": 13.5,
+                "P": 23.421875,
+                "Q": 25.00390625,
+                "X": 15.7109375,
+            },
+        }
+        for col, largura in ajustes_largura_por_aba.get(ws.title, {}).items():
+            ws.column_dimensions[col].width = largura
+
         # Linhas superiores mais consistentes visualmente (painel/link/estoque).
         for r in range(1, 7):
-            ws.row_dimensions[r].height = 18
+            ws.row_dimensions[r].height = 15.0
         ws.row_dimensions[7].height = 14.4
         ws.row_dimensions[8].height = 14.4
 
@@ -6261,10 +6414,11 @@ def aplicar_estilo_excel(
             ws,
             header_row=8,
             data_start_row=9,
-            fixed_widths={"D": 30.0, "F": 34.109375},
+            fixed_widths=larguras,
             limite_coluna=column_index_from_string("AA"),
             max_scan_rows=_scan_rows,
             modo_rapido=max_row_data > LIMIAR_LINHAS_TURBO_CONSOLIDADO,
+            ajustar_altura_linhas=False,
         )
         ws.freeze_panes = "A9"
         ult_col = get_column_letter(max(ws.max_column, column_index_from_string("AA")))
@@ -8835,14 +8989,14 @@ def processar_e_gerar_excel(
         for df in dfs:
             if df is None or df.empty:
                 continue
-            for _, row in df.iterrows():
-                venda = str(row.get("Venda", "") or "").strip()
-                cli_b = str(row.get("Cliente_Base", "") or "").strip()
+            for row in df.itertuples(index=False):
+                venda = str(getattr(row, "Venda", "") or "").strip()
+                cli_b = str(getattr(row, "Cliente_Base", "") or "").strip()
                 if not venda or not cli_b:
                     continue
                 cand = []
                 for col in ("Identificador_Produto", "Unidades"):
-                    raw = row.get(col, "")
+                    raw = getattr(row, col, "")
                     if raw is None or str(raw).strip() == "":
                         continue
                     if identificador_truncado(raw):
@@ -8878,6 +9032,50 @@ def processar_e_gerar_excel(
             if from_map:
                 return from_map
         return "NLOC"
+
+    def _normalizar_identificador_export_serie(serie: pd.Series) -> pd.Series:
+        if serie is None:
+            return pd.Series(dtype="object")
+
+        def _resolver_item(raw):
+            if raw is None:
+                return ""
+            txt = str(raw).strip()
+            if not txt or identificador_truncado(txt):
+                return ""
+            return normalizar_identificador(txt) or ""
+
+        return serie.fillna("").map(_resolver_item).astype(str)
+
+    def _aplicar_identificador_export(df_src: pd.DataFrame, mapa_id: dict) -> None:
+        if df_src is None or df_src.empty:
+            return
+        idx = df_src.index
+        serie_id = (
+            _normalizar_identificador_export_serie(df_src["Identificador_Produto"])
+            if "Identificador_Produto" in df_src.columns
+            else pd.Series("", index=idx, dtype="object")
+        )
+        serie_un = (
+            _normalizar_identificador_export_serie(df_src["Unidades"])
+            if "Unidades" in df_src.columns
+            else pd.Series("", index=idx, dtype="object")
+        )
+        venda = (
+            df_src["Venda"].fillna("").astype(str).str.strip()
+            if "Venda" in df_src.columns
+            else pd.Series("", index=idx, dtype="object")
+        )
+        cli_b = (
+            df_src["Cliente_Base"].fillna("").astype(str).str.strip()
+            if "Cliente_Base" in df_src.columns
+            else pd.Series("", index=idx, dtype="object")
+        )
+        chaves = pd.Series(list(zip(venda.tolist(), cli_b.tolist())), index=idx, dtype="object")
+        serie_mapa = chaves.map(mapa_id).fillna("").astype(str).str.strip()
+        serie_final = serie_id.where(serie_id.ne(""), serie_un)
+        serie_final = serie_final.where(serie_final.ne(""), serie_mapa)
+        df_src["Identificador_Produto"] = serie_final.where(serie_final.ne(""), "NLOC")
 
     _t_xlsx = time.perf_counter()
     # Colunas auxiliares solicitadas para DADOS RECEBER:
@@ -8918,14 +9116,8 @@ def processar_e_gerar_excel(
             }
         ).fillna("")
     mapa_id_estrito = _mapa_identificador_estrito(df_receber_tratado, df_recebidos_tratado)
-    if df_receber_tratado is not None and not df_receber_tratado.empty:
-        df_receber_tratado["Identificador_Produto"] = df_receber_tratado.apply(
-            lambda r: _resolver_identificador_export(r, mapa_id_estrito), axis=1
-        )
-    if df_recebidos_tratado is not None and not df_recebidos_tratado.empty:
-        df_recebidos_tratado["Identificador_Produto"] = df_recebidos_tratado.apply(
-            lambda r: _resolver_identificador_export(r, mapa_id_estrito), axis=1
-        )
+    _aplicar_identificador_export(df_receber_tratado, mapa_id_estrito)
+    _aplicar_identificador_export(df_recebidos_tratado, mapa_id_estrito)
 
     df_receber = _ordenar_colunas(_sem_colunas_internas_export(df_receber_tratado), [
         "Emp/Obra", "Venda", "Cliente", "Cliente_Base", "Identificador_Produto",

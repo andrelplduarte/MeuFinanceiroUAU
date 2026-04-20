@@ -27,6 +27,7 @@ from services.processador_uau import (
     aplicar_estilo_excel,
     aplicar_estilo_arquivo_so_aba_consolidado_estoque,
     aplicar_estilo_arquivo_so_aba_resumo_geral,
+    extrair_data_base,
     extrair_nome_empreendimento_nome_arquivo,
     extrair_nome_empreendimento_txt,
     identificar_tipo_relatorio_uau_por_texto,
@@ -416,7 +417,13 @@ def _split_arquivo_geral_recebidos_por_emp(caminho_txt: str) -> Dict[str, List[s
     return out
 
 
-def _escrever_bloco_temp_txt(prefixo: str, linhas: Sequence[str], *, tipo: str) -> str:
+def _escrever_bloco_temp_txt(
+    prefixo: str,
+    linhas: Sequence[str],
+    *,
+    tipo: str,
+    data_base_cabecalho: datetime | None = None,
+) -> str:
     meses_pt = {
         1: "janeiro",
         2: "fevereiro",
@@ -431,18 +438,21 @@ def _escrever_bloco_temp_txt(prefixo: str, linhas: Sequence[str], *, tipo: str) 
         11: "novembro",
         12: "dezembro",
     }
-    dt_max: datetime | None = None
-    for ln in linhas:
-        for m in re.finditer(r"\b(\d{2})/(\d{2})/(\d{4})\b", str(ln or "")):
-            try:
-                d = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)))
-            except Exception:
-                continue
-            if dt_max is None or d > dt_max:
-                dt_max = d
-    if dt_max is None:
-        dt_max = datetime.now()
-    data_base_ext = f"{dt_max.day} de {meses_pt.get(dt_max.month, 'janeiro')} de {dt_max.year}"
+    dt_ref = data_base_cabecalho
+    if dt_ref is None:
+        dt_max: datetime | None = None
+        for ln in linhas:
+            for m in re.finditer(r"\b(\d{2})/(\d{2})/(\d{4})\b", str(ln or "")):
+                try:
+                    d = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+                except Exception:
+                    continue
+                if dt_max is None or d > dt_max:
+                    dt_max = d
+        dt_ref = dt_max or datetime.now()
+    data_base_ext = (
+        f"{dt_ref.day} de {meses_pt.get(dt_ref.month, 'janeiro')} de {dt_ref.year}"
+    )
 
     fd, path = tempfile.mkstemp(prefix=prefixo + "_", suffix=".txt", text=True)
     cab_tipo = "Contas a Receber" if str(tipo).upper() == "RECEBER" else "Contas Recebidas"
@@ -454,6 +464,288 @@ def _escrever_bloco_temp_txt(prefixo: str, linhas: Sequence[str], *, tipo: str) 
         f.write("\n".join([str(x) for x in linhas if str(x).strip()]))
         f.write("\n")
     return path
+
+
+def _executar_lote_em_pares_isolados(
+    pares_processamento: Sequence[Dict[str, object]],
+    caminho_saida_base: str,
+    caminhos_estoque: Sequence[str] | None = None,
+    progresso_cb=None,
+) -> Tuple[Tuple[str, str], float]:
+    """
+    Executa a composição final do lote a partir de pares já resolvidos.
+    Usado pelo caminho de ARQUIVOS_GERAIS para não depender do fluxo
+    de pareamento do modo POR_EMPREENDIMENTO.
+    """
+    def _emitir_progresso(**payload):
+        if callable(progresso_cb):
+            try:
+                progresso_cb(payload)
+            except Exception:
+                pass
+
+    def _cor_tempo(segundos: float, media_ref: float) -> str:
+        base = max(1.0, float(media_ref or 0.0))
+        s = max(0.0, float(segundos or 0.0))
+        if s <= base * 0.85:
+            return "verde"
+        if s <= base * 1.05:
+            return "azul"
+        if s <= base * 1.30:
+            return "amarelo"
+        return "vermelho"
+
+    itens = [dict(x or {}) for x in pares_processamento if x]
+    if not itens:
+        raise ProcessamentoUAUErro(
+            etapa="ingestão",
+            funcao="_executar_lote_em_pares_isolados",
+            validacao="pares processáveis",
+            mensagem="Nenhum par válido foi montado para o processamento do lote.",
+            campo_ou_aba="arquivos gerais",
+        )
+
+    t0 = time.perf_counter()
+    pasta_saida = os.path.dirname(os.path.abspath(caminho_saida_base)) or "."
+    os.makedirs(pasta_saida, exist_ok=True)
+    pasta_temp_local = os.path.join(pasta_saida, "_tmp_lote_uau")
+    os.makedirs(pasta_temp_local, exist_ok=True)
+
+    chaves_ok = [str(item.get("chave") or "").strip() for item in itens if str(item.get("chave") or "").strip()]
+    _emitir_progresso(
+        status="iniciado",
+        total_empreendimentos=len(chaves_ok),
+        concluidos=0,
+        empreendimento_atual=None,
+    )
+
+    wb_exec = Workbook()
+    wb_exec.remove(wb_exec.active)
+    titulos_exec: set = set()
+    temporarios: List[str] = []
+    pastas_temp_workbook: List[str] = []
+    caminhos_motor_para_resumo: List[str] = []
+    consolidado_por_sigla: List[Tuple[str, str, float]] = []
+    consolidado_cache_por_path: Dict[str, pd.DataFrame] = {}
+    partes_dr: List[pd.DataFrame] = []
+    partes_dp: List[pd.DataFrame] = []
+    df_criterios_ref: pd.DataFrame | None = None
+    tempos_por_item: List[Dict[str, object]] = []
+    inicio_item_ts: float | None = None
+
+    try:
+        for idx, item in enumerate(itens, start=1):
+            chave = str(item.get("chave") or "").strip()
+            lista_r = [os.path.abspath(os.path.normpath(str(p))) for p in (item.get("receber") or []) if p]
+            lista_p = [os.path.abspath(os.path.normpath(str(p))) for p in (item.get("recebidos") or []) if p]
+            if not chave or not lista_r or not lista_p:
+                raise ProcessamentoUAUErro(
+                    etapa="ingestão",
+                    funcao="_executar_lote_em_pares_isolados",
+                    validacao="par por empreendimento",
+                    mensagem=f"Par inválido montado para a chave [{chave or 'SEM_CHAVE'}].",
+                    campo_ou_aba="arquivos gerais",
+                )
+
+            inicio_item_ts = time.perf_counter()
+            tempo_total_decorrido = max(0.0, time.perf_counter() - t0)
+            sigla = _sigla_canonica_para_saida(str(chave)) or _sigla_canonica_para_saida(
+                _sigla_curta_do_caminho(lista_r[0])
+            )
+            nome_aba_consolidado = _titulo_aba_consolidado_carteiras_geral(sigla)
+            _emitir_progresso(
+                status="processando",
+                total_empreendimentos=len(chaves_ok),
+                concluidos=idx - 1,
+                empreendimento_atual=chave,
+                item_atual_abas=nome_aba_consolidado,
+                abas_item=[nome_aba_consolidado],
+                itens_tempo=tempos_por_item,
+                tempo_decorrido_segundos=tempo_total_decorrido,
+                mensagem=f"Processando empreendimento {chave} no caminho de arquivos gerais...",
+            )
+
+            tmp_r = _fundir_textos_em_temp(lista_r, "rec_geral_iso")
+            tmp_p = _fundir_textos_em_temp(lista_p, "pag_geral_iso")
+            temporarios.extend([tmp_r, tmp_p])
+
+            wdir = os.path.join(pasta_temp_local, f"uau_gerais_wk_{uuid.uuid4().hex[:10]}")
+            os.makedirs(wdir, exist_ok=True)
+            pastas_temp_workbook.append(wdir)
+            placeholder = os.path.join(wdir, "base.xlsx")
+            ce_chave = _resolver_estoque_por_chave_lote(chave, caminhos_estoque or [], temporarios)
+
+            caminho_xlsx_motor, _ = processar_e_gerar_excel(
+                tmp_r,
+                tmp_p,
+                placeholder,
+                gerar_aba_resumo_geral=False,
+                gerar_aba_consolidado_estoque=False,
+                caminho_estoque=ce_chave,
+                progresso_cb=lambda payload, _ch=chave, _i=idx, _aba=nome_aba_consolidado: _emitir_progresso(
+                    status=str((payload or {}).get("status") or "processando"),
+                    total_empreendimentos=len(chaves_ok),
+                    concluidos=_i - 1,
+                    empreendimento_atual=str(_ch),
+                    item_atual_abas=str((payload or {}).get("item_atual_abas") or _aba),
+                    abas_item=(payload or {}).get("abas_item") or [_aba],
+                    itens_tempo=tempos_por_item,
+                    tempo_decorrido_segundos=(payload or {}).get("tempo_decorrido_segundos") or max(0.0, time.perf_counter() - t0),
+                    mensagem=(payload or {}).get("mensagem"),
+                ),
+            )
+
+            caminhos_motor_para_resumo.append(caminho_xlsx_motor)
+            dfc_sigla = ler_dataframe_consolidado_de_xlsx_motor(caminho_xlsx_motor)
+            consolidado_cache_por_path[caminho_xlsx_motor] = (
+                dfc_sigla if dfc_sigla is not None else pd.DataFrame()
+            )
+            soma_inad = 0.0
+            if dfc_sigla is not None and not dfc_sigla.empty and "Vl.Principal (Encargos)" in dfc_sigla.columns:
+                try:
+                    serie_inad = pd.to_numeric(dfc_sigla["Vl.Principal (Encargos)"], errors="coerce").fillna(0.0)
+                except Exception:
+                    serie_inad = pd.to_numeric(
+                        dfc_sigla["Vl.Principal (Encargos)"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+                        errors="coerce",
+                    ).fillna(0.0)
+                soma_inad = float(serie_inad.sum())
+            consolidado_por_sigla.append((sigla, caminho_xlsx_motor, soma_inad))
+
+            partes_dr.append(_ler_df_aba_xlsx_motor(caminho_xlsx_motor, "DADOS RECEBER", 7))
+            partes_dp.append(_ler_df_aba_xlsx_motor(caminho_xlsx_motor, "DADOS RECEBIDOS", 7))
+            if df_criterios_ref is None or (getattr(df_criterios_ref, "empty", True)):
+                dc = _ler_df_aba_xlsx_motor(caminho_xlsx_motor, "CRITERIOS ANALISES", 0)
+                if dc is not None and not dc.empty:
+                    df_criterios_ref = dc
+
+            dur_item = max(0.0, time.perf_counter() - (inicio_item_ts or time.perf_counter()))
+            tempos_base = [float(x.get("segundos", 0.0) or 0.0) for x in tempos_por_item if float(x.get("segundos", 0.0) or 0.0) > 0]
+            media_ref = (sum(tempos_base) / len(tempos_base)) if tempos_base else dur_item
+            tempos_por_item.append(
+                {
+                    "empreendimento": chave,
+                    "segundos": round(dur_item, 2),
+                    "cor": _cor_tempo(dur_item, media_ref),
+                    "abas": ["CONSOLIDADO", "DADOS RECEBER", "DADOS RECEBIDOS"],
+                }
+            )
+
+            concluidos_report = idx if idx < len(chaves_ok) else (idx - 1)
+            soma_real = sum(float(x.get("segundos", 0.0) or 0.0) for x in tempos_por_item)
+            media_exec = soma_real / max(1, len(tempos_por_item))
+            estim_total = max(soma_real + (len(chaves_ok) - len(tempos_por_item)) * media_exec, soma_real + 1.0)
+            percentual_tempo = int(min(99, max(1, (soma_real / estim_total) * 100.0)))
+            _emitir_progresso(
+                status="processando",
+                total_empreendimentos=len(chaves_ok),
+                concluidos=concluidos_report,
+                empreendimento_atual=chave,
+                item_atual_abas="DADOS_RECEBIDOS",
+                abas_item=["DADOS_RECEBIDOS"],
+                itens_tempo=tempos_por_item,
+                estimativa_total_segundos=round(float(estim_total), 2),
+                tempo_decorrido_segundos=round(max(0.0, time.perf_counter() - t0), 2),
+                percentual_tempo=percentual_tempo,
+            )
+
+        df_dr_u = _concat_dfs_vertical(partes_dr)
+        df_dp_u = _concat_dfs_vertical(partes_dp)
+        if df_criterios_ref is None:
+            df_criterios_ref = pd.DataFrame()
+
+        df_dr_sql = _ordenar_df_base_sql(
+            _promover_primeira_linha_cabecalho_se_necessario(_df_sql_like(df_dr_u if not df_dr_u.empty else pd.DataFrame())),
+            ("EMP_OBRA", "EMPREENDIMENTO", "VENDA", "CLIENTE", "IDENTIFICADOR_PRODUTO"),
+        )
+        df_dp_sql = _ordenar_df_base_sql(
+            _promover_primeira_linha_cabecalho_se_necessario(_df_sql_like(df_dp_u if not df_dp_u.empty else pd.DataFrame())),
+            ("EMP_OBRA", "EMPREENDIMENTO", "VENDA", "CLIENTE", "IDENTIFICADOR_PRODUTO"),
+        )
+        df_dr_sql = _padronizar_colunas_base_para_negocio(df_dr_sql, "RECEBER")
+        df_dp_sql = _padronizar_colunas_base_para_negocio(df_dp_sql, "RECEBIDOS")
+
+        partes_c = []
+        for pth in caminhos_motor_para_resumo:
+            dfc = consolidado_cache_por_path.get(pth)
+            if dfc is not None and not dfc.empty:
+                partes_c.append(dfc)
+        df_resumo_lote = pd.DataFrame()
+        titulo_rg: str | None = None
+        if partes_c:
+            df_resumo_lote = montar_dataframe_resumo_geral(pd.concat(partes_c, ignore_index=True))
+        if not df_resumo_lote.empty:
+            tmp_resumo = os.path.join(pasta_temp_local, f"uau_resumo_gerais_{uuid.uuid4().hex}.xlsx")
+            try:
+                with pd.ExcelWriter(tmp_resumo, engine="openpyxl") as wr:
+                    df_resumo_lote.to_excel(wr, sheet_name=NOME_ABA_RESUMO_GERAL, index=False, startrow=7)
+                db0 = _data_base_de_primeiro_xlsx_motor(caminhos_motor_para_resumo[0])
+                aplicar_estilo_arquivo_so_aba_resumo_geral(tmp_resumo, db0, "LOTE - ARQUIVOS GERAIS")
+                wb_r = load_workbook(tmp_resumo)
+                try:
+                    titulo_rg = _titulo_aba_unico(wb_exec, (NOME_ABA_RESUMO_GERAL or "RESUMO")[:31], titulos_exec)
+                    _copiar_planilha_estilizada(wb_r[NOME_ABA_RESUMO_GERAL], wb_exec, titulo_rg)
+                finally:
+                    wb_r.close()
+            finally:
+                _remover_seguro(tmp_resumo)
+
+        ordem_consolidados = sorted(consolidado_por_sigla, key=lambda x: (-float(x[2]), str(x[0]).upper()))
+        for sigla_ord, caminho_xlsx_ord, _ in ordem_consolidados:
+            _anexar_somente_consolidado_por_sigla(wb_exec, caminho_xlsx_ord, sigla_ord, titulos_exec)
+
+        if NOME_ABA_RESUMO_GERAL in wb_exec.sheetnames and wb_exec.sheetnames[0] != NOME_ABA_RESUMO_GERAL:
+            try:
+                idx_rg = wb_exec.sheetnames.index(NOME_ABA_RESUMO_GERAL)
+                wb_exec.move_sheet(wb_exec[NOME_ABA_RESUMO_GERAL], offset=-idx_rg)
+            except Exception:
+                pass
+
+        destino_exec = os.path.join(pasta_saida, "CARTEIRAS GERAL.xlsx")
+        destino_base = os.path.join(pasta_saida, "CARTEIRAS BANCO DE DADOS.xlsx")
+        destino_exec = _salvar_workbook_com_publicacao_segura(
+            wb_exec,
+            pasta_temp_local,
+            pasta_saida,
+            "CARTEIRAS GERAL.xlsx",
+        )
+
+        tmp_base = os.path.join(pasta_temp_local, f"uau_base_sql_gerais_{uuid.uuid4().hex}.xlsx")
+        with pd.ExcelWriter(tmp_base, engine="openpyxl") as wr_base:
+            (df_dr_sql if not df_dr_sql.empty else pd.DataFrame()).to_excel(wr_base, sheet_name="DADOS_RECEBER", index=False)
+            (df_dp_sql if not df_dp_sql.empty else pd.DataFrame()).to_excel(wr_base, sheet_name="DADOS_RECEBIDOS", index=False)
+        _aplicar_schema_e_formato_base_final(tmp_base, df_dr_sql, df_dp_sql)
+        try:
+            shutil.copy2(tmp_base, destino_base)
+        except OSError:
+            destino_base = os.path.join(
+                pasta_saida,
+                f"CARTEIRAS BANCO DE DADOS - {datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            )
+            shutil.copy2(tmp_base, destino_base)
+
+        _emitir_progresso(
+            status="concluido",
+            total_empreendimentos=len(chaves_ok),
+            concluidos=len(chaves_ok),
+            empreendimento_atual=None,
+            item_atual_abas="DOWNLOAD DISPONIVEL",
+            abas_item=["CARTEIRAS GERAL", "CARTEIRAS BANCO DE DADOS"],
+            itens_tempo=tempos_por_item,
+            tempo_decorrido_segundos=round(max(0.0, time.perf_counter() - t0), 2),
+            estimativa_total_segundos=round(max(0.0, time.perf_counter() - t0), 2),
+            percentual_tempo=100,
+            mensagem="Arquivos gerais processados com sucesso no caminho isolado.",
+        )
+        return (destino_exec, destino_base), time.perf_counter() - t0
+    finally:
+        for p in temporarios:
+            _remover_seguro(p)
+        for d in pastas_temp_workbook:
+            try:
+                shutil.rmtree(d, ignore_errors=True)
+            except OSError:
+                pass
 
 
 def processar_lote_arquivos_gerais(
@@ -479,6 +771,8 @@ def processar_lote_arquivos_gerais(
         )
     _validar_tipo_arquivo(c_r, "RECEBER", "Contas a Receber (geral)")
     _validar_tipo_arquivo(c_p, "RECEBIDOS", "Contas Recebidas (geral)")
+    data_base_receber = extrair_data_base(c_r)
+    data_base_recebidos = extrair_data_base(c_p)
 
     grupos_r = _split_arquivo_geral_receber_por_emp(c_r)
     grupos_p = _split_arquivo_geral_recebidos_por_emp(c_p)
@@ -503,22 +797,33 @@ def processar_lote_arquivos_gerais(
 
     temporarios: List[str] = []
     try:
-        cr: List[str] = []
-        cp: List[str] = []
+        pares_processamento: List[Dict[str, object]] = []
         for k in chaves:
-            pr = _escrever_bloco_temp_txt(f"geral_rec_{k}", grupos_r[k], tipo="RECEBER")
-            pp = _escrever_bloco_temp_txt(f"geral_reb_{k}", grupos_p[k], tipo="RECEBIDOS")
+            pr = _escrever_bloco_temp_txt(
+                f"geral_rec_{k}",
+                grupos_r[k],
+                tipo="RECEBER",
+                data_base_cabecalho=data_base_receber,
+            )
+            pp = _escrever_bloco_temp_txt(
+                f"geral_reb_{k}",
+                grupos_p[k],
+                tipo="RECEBIDOS",
+                data_base_cabecalho=data_base_recebidos,
+            )
             temporarios.extend([pr, pp])
-            cr.append(pr)
-            cp.append(pp)
-        return processar_lote_uau(
-            cr,
-            cp,
+            pares_processamento.append(
+                {
+                    "chave": k,
+                    "receber": [pr],
+                    "recebidos": [pp],
+                }
+            )
+        return _executar_lote_em_pares_isolados(
+            pares_processamento,
             caminho_saida_base,
-            MODO_POR_EMPREENDIMENTO,
             caminhos_estoque=caminhos_estoque,
             progresso_cb=progresso_cb,
-            pular_validacao_entrada=True,
         )
     finally:
         for p in temporarios:
@@ -607,11 +912,17 @@ def _copiar_planilha_estilizada(ws_src, wb_dst, titulo: str):
             dst.value = src.value
             if src.has_style:
                 try:
-                    dst.font = copy(src.font)
-                    dst.fill = copy(src.fill)
-                    dst.border = copy(src.border)
-                    dst.alignment = copy(src.alignment)
-                    dst.number_format = src.number_format
+                    dst._style = copy(src._style)
+                except Exception:
+                    pass
+            if src.hyperlink:
+                try:
+                    dst._hyperlink = copy(src.hyperlink)
+                except Exception:
+                    pass
+            if src.comment:
+                try:
+                    dst.comment = copy(src.comment)
                 except Exception:
                     pass
     for col_letter, dim in ws_src.column_dimensions.items():
@@ -997,6 +1308,32 @@ def _copiar_abas_ordenadas_para_destino(
         _copiar_planilha_estilizada(wb_fonte[orig], wb_dest, titulo_final)
 
 
+def _salvar_workbook_com_publicacao_segura(
+    wb: Workbook,
+    pasta_temp_local: str,
+    pasta_saida: str,
+    nome_arquivo_final: str,
+) -> str:
+    """
+    Salva o workbook primeiro em arquivo temporário e publica no destino final.
+    Se o destino padrão estiver bloqueado (ex.: arquivo aberto no Excel),
+    gera um nome alternativo com timestamp para não perder o processamento.
+    """
+    tmp_xlsx = os.path.join(pasta_temp_local, f"wb_pub_{uuid.uuid4().hex}.xlsx")
+    destino_preferencial = os.path.join(pasta_saida, nome_arquivo_final)
+    wb.save(tmp_xlsx)
+    try:
+        shutil.copy2(tmp_xlsx, destino_preferencial)
+        return destino_preferencial
+    except OSError:
+        nome_alt = f"{os.path.splitext(nome_arquivo_final)[0]} - {datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        destino_alternativo = os.path.join(pasta_saida, nome_alt)
+        shutil.copy2(tmp_xlsx, destino_alternativo)
+        return destino_alternativo
+    finally:
+        _remover_seguro(tmp_xlsx)
+
+
 def processar_lote_uau(
     caminhos_receber: Sequence[str],
     caminhos_recebidos: Sequence[str],
@@ -1360,11 +1697,17 @@ def processar_lote_uau(
                 pass
         destino_exec = os.path.join(pasta_saida, "CARTEIRAS GERAL.xlsx")
         destino_base = os.path.join(pasta_saida, "CARTEIRAS BANCO DE DADOS.xlsx")
-        wb_exec.save(destino_exec)
+        destino_exec = _salvar_workbook_com_publicacao_segura(
+            wb_exec,
+            pasta_temp_local,
+            pasta_saida,
+            "CARTEIRAS GERAL.xlsx",
+        )
 
-        # Lote: gera CONSOLIDADO ESTOQUE somente no arquivo final
-        # (sem criar aba de estoque nos workbooks intermediários por empreendimento).
-        if caminhos_estoque:
+        # O arquivo final homologado CARTEIRAS GERAL não carrega a aba de estoque.
+        # Mantemos o consolidado de estoque fora deste workbook para preservar
+        # a estrutura visual esperada pelo usuário.
+        if False and caminhos_estoque:
             from services.estoque_uau import (
                 COLUNAS_SAIDA_CONSOLIDADO_ESTOQUE,
                 CONSOLIDADO_ESTOQUE_PANDAS_STARTROW,
