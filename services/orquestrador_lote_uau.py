@@ -912,7 +912,12 @@ def _copiar_planilha_estilizada(ws_src, wb_dst, titulo: str):
             dst.value = src.value
             if src.has_style:
                 try:
-                    dst._style = copy(src._style)
+                    dst.font = copy(src.font)
+                    dst.fill = copy(src.fill)
+                    dst.border = copy(src.border)
+                    dst.alignment = copy(src.alignment)
+                    dst.number_format = src.number_format
+                    dst.protection = copy(src.protection)
                 except Exception:
                     pass
             if src.hyperlink:

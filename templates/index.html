@@ -2660,6 +2660,7 @@
             var progressoRealAtivo = false;
             var estimativaAtualSegundos = 0;
             var estimativaTotalSegundos = 0;
+            var ESTIMATIVA_FIXA_SEGUNDOS = 30 * 60;
             var HIST_KEY = "uau_exec_history_v1";
             var HIST_EMP_KEY = "uau_exec_history_emp_v1";
             var ACTIVE_TOKEN_KEY = "uau_active_process_token_v1";
@@ -3067,7 +3068,7 @@
                     return;
                 }
                 monitorPrecisaoTempo.textContent = "Estimativa inicial";
-                monitorPrecisaoSub.textContent = "Enquanto o servidor não retorna dados, o painel usa histórico e volume atual do lote.";
+                monitorPrecisaoSub.textContent = "O painel está usando a previsão fixa de 30 minutos.";
             }
 
             function atualizarDownloadMonitor(status) {
@@ -3134,24 +3135,10 @@
             }
 
             function textoEstimativa(nr, np, ne) {
-                var total = nr + np + ne;
-                var estimadoEmp = estimativaPorEmpreendimentoSelecionado();
-                if (estimadoEmp > 0) {
-                    return {
-                        texto: "",
-                        segundos: estimadoEmp
-                    };
-                }
-                var estimadoHist = estimativaBaseadaEmHistorico(total);
-                if (estimadoHist > 0) {
-                    return {
-                        texto: "",
-                        segundos: estimadoHist
-                    };
-                }
-                if (total <= 2) return { texto: "Estimativa: 1 a 3 minutos (base pequena).", segundos: 120 };
-                if (total <= 6) return { texto: "Estimativa: 3 a 8 minutos (base média).", segundos: 360 };
-                return { texto: "Estimativa: 8+ minutos (lote grande).", segundos: 780 };
+                return {
+                    texto: "Estimativa fixa: 30 minutos.",
+                    segundos: ESTIMATIVA_FIXA_SEGUNDOS
+                };
             }
 
             function atualizarResumoProgresso(segundos, totalEmpreendimentos) {
@@ -3248,16 +3235,12 @@
                         : "Servidor ainda sem contador próprio; mantendo cronômetro local.";
                 }
                 if (monitorFonteEstimativa) {
-                    if (Number(data.estimativa_total_segundos || 0) > 0) {
-                        monitorFonteEstimativa.textContent = "Previsão refinada pelo servidor com base no ritmo atual do lote.";
-                    } else {
-                        monitorFonteEstimativa.textContent = "Previsão ainda apoiada no histórico local do navegador.";
-                    }
+                    monitorFonteEstimativa.textContent = "Previsão fixa configurada em 30 minutos.";
                 }
                 if (monitorProgressTrack) {
                     monitorProgressTrack.setAttribute("aria-valuenow", String(percentual));
                 }
-                var baseTotal = Number(data.estimativa_total_segundos || estimativaTotalSegundos || estimativaAtualSegundos || 0);
+                var baseTotal = Number(estimativaTotalSegundos || estimativaAtualSegundos || ESTIMATIVA_FIXA_SEGUNDOS || 0);
                 var restanteReal = Math.max(0, Math.floor(baseTotal - segParaDisplay));
                 atualizarMetaTempo(segParaDisplay, baseTotal, restanteReal);
                 atualizarPrecisaoTempo(String(data.status || "processando"), tDec > 0 || percentualInformado > 0);
@@ -3295,12 +3278,10 @@
                         })
                         .then(function (data) {
                             if (!data || data.ok !== true) return;
-                            if (Number(data.estimativa_total_segundos || 0) > 0) {
-                                estimativaTotalSegundos = Number(data.estimativa_total_segundos || 0);
-                                var segAgora = Math.floor((Date.now() - inicioMs) / 1000);
-                                var restanteAgora = Math.max(0, Math.floor(estimativaTotalSegundos - segAgora));
-                                if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(restanteAgora);
-                            }
+                            estimativaTotalSegundos = ESTIMATIVA_FIXA_SEGUNDOS;
+                            var segAgora = Math.floor((Date.now() - inicioMs) / 1000);
+                            var restanteAgora = Math.max(0, Math.floor(estimativaTotalSegundos - segAgora));
+                            if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(restanteAgora);
                             aplicarProgressoReal(data);
                         })
                         .catch(function (err) {
@@ -3327,9 +3308,9 @@
                 if (monitorModo) monitorModo.textContent = textoModoMonitor();
                 var totais = calcularTotaisMonitor();
                 var est = textoEstimativa(totais.receber, totais.recebidos, totais.estoque);
-                estimativaAtualSegundos = Number(est.segundos || 0);
+                estimativaAtualSegundos = Number(est.segundos || ESTIMATIVA_FIXA_SEGUNDOS);
                 estimativaTotalSegundos = estimativaAtualSegundos;
-                if (monitorEstimativa) monitorEstimativa.textContent = "";
+                if (monitorEstimativa) monitorEstimativa.textContent = est.texto || "Estimativa fixa: 30 minutos.";
                 if (contadorEstimado) contadorEstimado.textContent = formatarMmSs(estimativaTotalSegundos || 0);
                 if (statusEl) statusEl.textContent = "Inicializando validações e leitura dos arquivos…";
                 if (monitorFase) monitorFase.textContent = "Preparando leitura e validação inicial";

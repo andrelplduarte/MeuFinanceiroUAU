@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.formatting.rule import FormulaRule
+from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.utils.cell import quote_sheetname
@@ -641,6 +641,8 @@ def normalizar_emp_obra(txt):
     txt = re.sub(r"\s+", "", txt)
     txt = txt.replace("SCPG O", "SCPGO")
     txt = txt.replace("SCPG0", "SCPGO")
+    if txt == "69/LTMO":
+        txt = "69/LTMON"
     txt = txt.replace("51/BVGW", "51/BVGWH")
     txt = txt.replace("/BVGW", "/BVGWH")
     # Bella White: colapsa 51/BVGWH, 51/BVGWHHH, 51/BVGWHHHH etc. → 51/BVGWH (exibição/chave única).
@@ -733,6 +735,8 @@ def identificador_tem_formato_endereco(txt):
         r"\bBLOCO\s*\w+.*\bAPTO\s*\w+",
         r"\bUNIDADE\s*\w+",
         r"\bTORRE\s*\w+.*\bAPTO\s*\w+",
+        r"\b\d+\s*-\s*TORRE\s*\w+",
+        r"\b\d+\s*-\s*BLOCO\s*\w+",
     ]
 
     return any(re.search(p, txt, flags=re.IGNORECASE) for p in padroes)
@@ -5559,7 +5563,34 @@ def _aplicar_estilo_aba_resumo_geral(wb, data_base, nome_empreendimento):
         ws[f"K{linha}"] = f"=IFERROR(E{linha}/J{linha},0)"
         ws[f"L{linha}"] = f"=IFERROR(G{linha}/J{linha},0)"
         ws[f"M{linha}"] = f"=IFERROR(I{linha}/J{linha},0)"
-        ws[f"N{linha}"] = f"=IF(L{linha}>=15%,\"ALTO\",IF(L{linha}>=5%,\"MÉDIO\",\"BAIXO\"))"
+        ws[f"N{linha}"] = f"=IF(L{linha}>=15%,\"ALTO\",IF(L{linha}>=6%,\"MÉDIO\",\"BAIXO\"))"
+
+    if max_row_data >= 9:
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            CellIsRule(operator="greaterThanOrEqual", formula=["0.15"], stopIfTrue=True, fill=fill_alto, font=font_cond),
+        )
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            FormulaRule(formula=["AND($L9>=0.06,$L9<0.15)"], stopIfTrue=True, fill=fill_medio, font=font_cond),
+        )
+        ws.conditional_formatting.add(
+            f"L9:L{max_row_data}",
+            FormulaRule(formula=['AND($L9<0.06,$L9<>"")'], stopIfTrue=True, fill=fill_baixo, font=font_cond),
+        )
+
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['OR(UPPER($N9)="ALTO",UPPER($N9)="ALTA")'], stopIfTrue=True, fill=fill_alto, font=font_cond),
+        )
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['OR(UPPER($N9)="MÉDIO",UPPER($N9)="MEDIO")'], stopIfTrue=True, fill=fill_medio, font=font_cond),
+        )
+        ws.conditional_formatting.add(
+            f"N9:N{max_row_data}",
+            FormulaRule(formula=['UPPER($N9)="BAIXO"'], stopIfTrue=True, fill=fill_baixo, font=font_cond),
+        )
 
     # Larguras do modelo de referência (Downloads\CARTEIRAS GERAL.xlsx), aba RESUMO GERAL.
     larguras_rg = {
@@ -6364,19 +6395,19 @@ def aplicar_estilo_excel(
             "K": 11.0,
             "L": 13.5,
             "M": 13.0,
-            "N": 13.0,
+            "N": 14.0,
             "O": 13.0,
             "P": 20.0,
-            "Q": 13.0,
+            "Q": 24.0,
             "R": 11.0,
             "S": 13.0,
             "T": 14.0,
             "U": 9.0,
             "V": 17.2,
             "W": 12.2,
-            "X": 13.0,
+            "X": 24.0,
             "Y": 21.9,
-            "Z": 13.0,
+            "Z": 22.0,
             "AA": 18.3,
         }
 
@@ -6389,15 +6420,15 @@ def aplicar_estilo_excel(
                 "M": 14.203125,
                 "N": 17.62109375,
                 "O": 13.5,
-                "Q": 28.421875,
-                "X": 20.7109375,
+                "Q": 24.0,
+                "X": 24.0,
             },
             "NVLOT.NIL.VELOSO.RVD-GO": {
                 "N": 14.7109375,
                 "O": 13.5,
                 "P": 23.421875,
-                "Q": 25.00390625,
-                "X": 15.7109375,
+                "Q": 24.0,
+                "X": 24.0,
             },
         }
         for col, largura in ajustes_largura_por_aba.get(ws.title, {}).items():
