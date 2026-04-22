@@ -1,0 +1,23 @@
+services:
+  - name: meu-financeiro-uau
+    type: web
+    runtime: python
+    plan: starter
+    region: oregon
+    branch: fix/estoque-nao-insere
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 3600 app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.3
+      - key: APP_ENV
+        value: production
+      - key: APP_DATA_ROOT
+        value: /var/data/meu-financeiro-uau
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+    disk:
+      name: app-data
+      mountPath: /var/data
+      sizeGB: 10

@@ -18,8 +18,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-meu-financeiro-uau-altere-em-producao")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-OUTPUT_FOLDER = os.path.join(BASE_DIR, "outputs")
+APP_ENV = str(os.environ.get("APP_ENV") or "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
+DATA_ROOT = os.path.abspath(os.environ.get("APP_DATA_ROOT") or BASE_DIR)
+UPLOAD_FOLDER = os.path.join(DATA_ROOT, "uploads")
+OUTPUT_FOLDER = os.path.join(DATA_ROOT, "outputs")
 PROGRESS_FOLDER = os.path.join(OUTPUT_FOLDER, "_progress")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -29,6 +32,10 @@ os.makedirs(PROGRESS_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB (lote com vários TXT)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = IS_PRODUCTION
+app.config["PREFERRED_URL_SCHEME"] = "https" if IS_PRODUCTION else "http"
 
 EXTENSAO_PERMITIDA = ".txt"
 PROGRESS_TTL_SECONDS = 60 * 60 * 6
@@ -905,8 +912,18 @@ def tratar_arquivo_muito_grande(_erro):
     ), 413
 
 
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return jsonify(
+        {
+            "ok": True,
+            "app_env": APP_ENV,
+            "data_root": DATA_ROOT,
+        }
+    ), 200
+
+
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(debug=debug_mode)
-
 

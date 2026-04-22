@@ -14,3 +14,4 @@ tzdata==2025.3
 et_xmlfile==2.0.0
 six==1.17.0
 colorama==0.4.6
+gunicorn==23.0.0
