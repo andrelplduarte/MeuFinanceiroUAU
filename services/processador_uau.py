@@ -692,6 +692,8 @@ def normalizar_identificador(texto):
     texto = re.sub(r"\bL\s+OTE\b", "LOTE", texto)
     texto = re.sub(r"\bQ\s+UADRA\b", "QUADRA", texto)
     texto = re.sub(r"\bLOTEPARCELA\b", "LOTE PARCELA", texto)
+    texto = re.sub(r"\bLOTEPAR\.\s*NEGOCIADA\b", "LOTE PAR. NEGOCIADA", texto)
+    texto = re.sub(r"\bLOTEPAR\s+NEGOCIADA\b", "LOTE PAR NEGOCIADA", texto)
     texto = re.sub(r"\bLOTEENTRADA\b", "LOTE ENTRADA", texto)
     texto = re.sub(r"\b(QUADRA|LOTE|UNIDADE|APTO|APT|BLOCO|TORRE|CASA)(\d+[A-Z]?)\b", r"\1 \2", texto)
     texto = texto.replace("/ LOTE", "/LOTE")
@@ -719,6 +721,8 @@ def _limpar_sufixos_operacionais_identificador(texto):
             r"TX\s+EVOLU.*|"
             r"TAXA\s+EVOLU.*|"
             r"PARCELA\b.*|"
+            r"PAR\.\s*NEGOCIADA\b.*|"
+            r"PAR\s+NEGOCIADA\b.*|"
             r"ENTRADA\b.*|"
             r"SINAL\b.*|"
             r"INTERMED(?:IARIA)?\b.*|"
@@ -4709,6 +4713,12 @@ def montar_consolidado(
                 .to_dict()
             )
             consolidado["Identificador"] = consolidado["Venda"].astype(str).str.strip().map(mapa_id_final).fillna(consolidado["Identificador"]).astype(str).str.strip()
+            _id_atual = consolidado["Identificador"].fillna("").astype(str).str.strip()
+            _id_map = consolidado["Venda"].astype(str).str.strip().map(mapa_id_final).fillna("").astype(str).str.strip()
+            _mask_id_vazio = _id_atual.eq("") | _id_atual.str.upper().isin(["NLOC", "NAN", "NONE"])
+            _mask_id_fill = _mask_id_vazio & _id_map.ne("")
+            if bool(_mask_id_fill.any()):
+                consolidado.loc[_mask_id_fill, "Identificador"] = _id_map.loc[_mask_id_fill]
         preencher_identificador_vazio_de_mapas_brutos(
             consolidado, mapa_id_vc_bruto, mapa_id_v_bruto, alertas_conferencia
         )
