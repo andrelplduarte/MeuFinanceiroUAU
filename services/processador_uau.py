@@ -710,9 +710,24 @@ def _limpar_sufixos_operacionais_identificador(texto):
 
     def _limpar_parte(parte):
         parte = str(parte or "").strip()
-        parte = re.sub(r"\s+CUSTAS\b.*$", "", parte, flags=re.IGNORECASE)
-        parte = re.sub(r"\s+TX\s+EVOLU.*$", "", parte, flags=re.IGNORECASE)
-        parte = re.sub(r"\s+PARCELA\s+\d+\s*/\s*\d+\s*$", "", parte, flags=re.IGNORECASE)
+        parte = re.sub(
+            r"\s+(?:"
+            r"CUSTAS?\b|"
+            r"FINANC(?:IAMENTO)?\s+BANCARIO\b|"
+            r"TX\s+EVOLU.*|"
+            r"TAXA\s+EVOLU.*|"
+            r"PARCELA\b.*|"
+            r"ENTRADA\b.*|"
+            r"SINAL\b.*|"
+            r"INTERMED(?:IARIA)?\b.*|"
+            r"BAL[AÃ]O\b.*"
+            r").*$",
+            "",
+            parte,
+            flags=re.IGNORECASE,
+        )
+        if re.fullmatch(r"QUADR|QUADRA|LOTE|QUADRA/LOTE", parte, flags=re.IGNORECASE):
+            return ""
         return parte.strip()
 
     partes = [_limpar_parte(p) for p in texto.split("|")]
