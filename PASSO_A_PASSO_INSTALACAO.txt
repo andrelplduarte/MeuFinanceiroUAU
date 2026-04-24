@@ -76,7 +76,7 @@ Observacao: o sistema roda em segundo plano, sem deixar a janela preta aberta.
 - CENTRAL UAU - ENCERRAR
   Atalho com icone e X vermelho para encerrar o sistema.
 
-- static/img/central-uau-launcher-icon.ico
+- static/img/central-uau-launcher-check-icon.ico
   Icone usado no atalho de iniciar.
 
 - static/img/central-uau-stop-icon.ico
