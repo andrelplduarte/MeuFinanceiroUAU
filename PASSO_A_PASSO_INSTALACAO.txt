@@ -1,0 +1,89 @@
+MEU FINANCEIRO UAU - PASSO A PASSO PARA RODAR EM OUTRO COMPUTADOR
+
+1. O que a pessoa precisa baixar
+
+- Python 3.14 para Windows
+  Site: https://www.python.org/downloads/
+  Durante a instalacao, marcar a opcao:
+  Add python.exe to PATH
+
+- Google Chrome, Microsoft Edge ou outro navegador moderno.
+
+2. Como preparar o sistema
+
+- Extrair/descompactar a pasta recebida.
+- Entrar na pasta MeuFinanceiroUAU.
+- Dar dois cliques no arquivo:
+  INSTALAR_DEPENDENCIAS.bat
+
+Esse arquivo cria o ambiente virtual "venv" e instala as bibliotecas do arquivo requirements.txt.
+Esse passo precisa ser feito apenas na primeira vez, ou quando trocar de computador.
+
+3. Como abrir o sistema depois de instalado
+
+- Entrar na pasta MeuFinanceiroUAU.
+- Dar dois cliques no arquivo:
+  INICIAR_APLICACAO.bat
+
+O navegador deve abrir automaticamente em:
+http://127.0.0.1:5000
+
+Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
+
+4. Como parar o sistema
+
+- Fechar a janela preta que abriu junto com o sistema; ou
+- Clicar na janela preta e apertar CTRL+C.
+
+5. Arquivos importantes
+
+- app.py
+  Arquivo principal da aplicacao.
+
+- services/
+  Motor de processamento.
+
+- templates/
+  Tela do sistema.
+
+- static/
+  Imagens e arquivos visuais.
+
+- requirements.txt
+  Lista de bibliotecas Python que precisam ser instaladas.
+
+- INSTALAR_DEPENDENCIAS.bat
+  Prepara o computador na primeira instalacao.
+
+- INICIAR_APLICACAO.bat
+  Abre o sistema no dia a dia.
+
+6. Pastas que o sistema cria ou usa
+
+- uploads/
+  Arquivos enviados pelo usuario durante o uso.
+
+- outputs/
+  Arquivos Excel gerados pelo sistema.
+
+Essas pastas podem ser criadas automaticamente quando o sistema roda.
+
+7. Problemas comuns
+
+Problema: "Python nao encontrado"
+Solucao: instalar o Python e marcar "Add python.exe to PATH".
+
+Problema: a tela abre, mas o navegador nao mostra o sistema
+Solucao: aguardar alguns segundos e acessar manualmente:
+http://127.0.0.1:5000
+
+Problema: porta 5000 ocupada
+Solucao: fechar outras janelas do sistema que estejam abertas e executar novamente.
+
+Problema: erro ao instalar dependencias
+Solucao: verificar se a internet esta funcionando e executar novamente INSTALAR_DEPENDENCIAS.bat.
+
+8. Observacao
+
+Esse pacote nao inclui a pasta venv, arquivos temporarios, historico Git, uploads antigos ou outputs antigos.
+Isso deixa a copia mais leve e mais limpa para compartilhar.
