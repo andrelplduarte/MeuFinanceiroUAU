@@ -15,15 +15,6 @@ if not exist "venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo Iniciando Meu Financeiro UAU...
-echo.
-echo Quando quiser parar a aplicacao, feche esta janela ou aperte CTRL+C.
-echo.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$portaAberta = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if (-not $portaAberta) { Start-Process -FilePath (Join-Path $PWD 'venv\Scripts\pythonw.exe') -ArgumentList 'app.py' -WorkingDirectory $PWD; Start-Sleep -Seconds 2 }; Start-Process 'http://127.0.0.1:5000'"
 
-start "" powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:5000'"
-
-"venv\Scripts\python.exe" app.py
-
-echo.
-echo Aplicacao encerrada.
-pause
+exit /b 0

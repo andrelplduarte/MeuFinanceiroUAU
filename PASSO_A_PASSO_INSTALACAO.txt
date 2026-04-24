@@ -35,8 +35,11 @@ Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
 
 4. Como parar o sistema
 
-- Fechar a janela preta que abriu junto com o sistema; ou
-- Clicar na janela preta e apertar CTRL+C.
+- Entrar na pasta MeuFinanceiroUAU.
+- Dar dois cliques no arquivo:
+  PARAR_APLICACAO.bat
+
+Observacao: o sistema roda em segundo plano, sem deixar a janela preta aberta.
 
 5. Arquivos importantes
 
@@ -59,7 +62,10 @@ Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
   Prepara o computador na primeira instalacao.
 
 - INICIAR_APLICACAO.bat
-  Abre o sistema no dia a dia.
+  Abre o sistema no dia a dia, sem deixar a janela preta aberta.
+
+- PARAR_APLICACAO.bat
+  Encerra o sistema quando ele estiver rodando em segundo plano.
 
 - CENTRAL UAU - INICIAR
   Atalho com icone para abrir o sistema com dois cliques.
