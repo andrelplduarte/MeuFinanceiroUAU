@@ -36,7 +36,10 @@ Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
 4. Como parar o sistema
 
 - Entrar na pasta MeuFinanceiroUAU.
-- Dar dois cliques no arquivo:
+- Dar dois cliques no atalho:
+  CENTRAL UAU - ENCERRAR
+
+Se o atalho nao aparecer no computador, tambem funciona dar dois cliques no arquivo:
   PARAR_APLICACAO.bat
 
 Observacao: o sistema roda em segundo plano, sem deixar a janela preta aberta.
@@ -70,8 +73,14 @@ Observacao: o sistema roda em segundo plano, sem deixar a janela preta aberta.
 - CENTRAL UAU - INICIAR
   Atalho com icone para abrir o sistema com dois cliques.
 
+- CENTRAL UAU - ENCERRAR
+  Atalho com icone e X vermelho para encerrar o sistema.
+
 - static/img/central-uau-launcher-icon.ico
-  Icone usado no atalho.
+  Icone usado no atalho de iniciar.
+
+- static/img/central-uau-stop-icon.ico
+  Icone usado no atalho de encerrar.
 
 6. Pastas que o sistema cria ou usa
 
