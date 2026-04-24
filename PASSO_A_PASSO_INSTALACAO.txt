@@ -22,7 +22,10 @@ Esse passo precisa ser feito apenas na primeira vez, ou quando trocar de computa
 3. Como abrir o sistema depois de instalado
 
 - Entrar na pasta MeuFinanceiroUAU.
-- Dar dois cliques no arquivo:
+- Dar dois cliques no atalho:
+  Iniciar Meu Financeiro UAU
+
+Se o atalho nao aparecer no computador, tambem funciona dar dois cliques no arquivo:
   INICIAR_APLICACAO.bat
 
 O navegador deve abrir automaticamente em:
@@ -57,6 +60,12 @@ Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
 
 - INICIAR_APLICACAO.bat
   Abre o sistema no dia a dia.
+
+- Iniciar Meu Financeiro UAU
+  Atalho com icone para abrir o sistema com dois cliques.
+
+- static/img/meu-financeiro-uau-icon.ico
+  Icone usado no atalho.
 
 6. Pastas que o sistema cria ou usa
 
