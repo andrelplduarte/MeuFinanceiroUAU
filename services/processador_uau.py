@@ -699,7 +699,24 @@ def normalizar_identificador(texto):
     texto = texto.replace(" /", "/")
     texto = texto.replace("/ ", "/")
     texto = re.sub(r"\s+", " ", texto)
+    texto = _limpar_sufixos_operacionais_identificador(texto)
     return texto.strip(" |")
+
+
+def _limpar_sufixos_operacionais_identificador(texto):
+    texto = str(texto or "").strip()
+    if not texto:
+        return ""
+
+    def _limpar_parte(parte):
+        parte = str(parte or "").strip()
+        parte = re.sub(r"\s+CUSTAS\b.*$", "", parte, flags=re.IGNORECASE)
+        parte = re.sub(r"\s+TX\s+EVOLU.*$", "", parte, flags=re.IGNORECASE)
+        parte = re.sub(r"\s+PARCELA\s+\d+\s*/\s*\d+\s*$", "", parte, flags=re.IGNORECASE)
+        return parte.strip()
+
+    partes = [_limpar_parte(p) for p in texto.split("|")]
+    return "|".join(p for p in partes if p).strip()
 
 
 def limpar_texto_nome(txt):
