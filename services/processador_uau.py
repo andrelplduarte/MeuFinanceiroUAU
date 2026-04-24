@@ -691,6 +691,8 @@ def normalizar_identificador(texto):
     texto = texto.replace("LOT E", "LOTE")
     texto = re.sub(r"\bL\s+OTE\b", "LOTE", texto)
     texto = re.sub(r"\bQ\s+UADRA\b", "QUADRA", texto)
+    texto = re.sub(r"\bLOTEPARCELA\b", "LOTE PARCELA", texto)
+    texto = re.sub(r"\bLOTEENTRADA\b", "LOTE ENTRADA", texto)
     texto = re.sub(r"\b(QUADRA|LOTE|UNIDADE|APTO|APT|BLOCO|TORRE|CASA)(\d+[A-Z]?)\b", r"\1 \2", texto)
     texto = texto.replace("/ LOTE", "/LOTE")
     texto = texto.replace(" /LOTE", "/LOTE")
@@ -726,7 +728,8 @@ def _limpar_sufixos_operacionais_identificador(texto):
             parte,
             flags=re.IGNORECASE,
         )
-        if re.fullmatch(r"QUADR|QUADRA|LOTE|QUADRA/LOTE", parte, flags=re.IGNORECASE):
+        parte = re.sub(r"/(?:PARCELA|ENTRADA)\b.*$", "", parte, flags=re.IGNORECASE)
+        if re.fullmatch(r"QUADR|QUADRA|LOTE|QUADRA/LOTE|QUADRA\s+\w+|QUADRA\s+\w+/LOTE", parte, flags=re.IGNORECASE):
             return ""
         return parte.strip()
 
