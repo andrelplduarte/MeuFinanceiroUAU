@@ -23,7 +23,7 @@ Esse passo precisa ser feito apenas na primeira vez, ou quando trocar de computa
 
 - Entrar na pasta MeuFinanceiroUAU.
 - Dar dois cliques no atalho:
-  Iniciar Meu Financeiro UAU
+  CENTRAL UAU - INICIAR
 
 Se o atalho nao aparecer no computador, tambem funciona dar dois cliques no arquivo:
   INICIAR_APLICACAO.bat
@@ -61,10 +61,10 @@ Se o navegador nao abrir sozinho, copie esse endereco e cole no navegador.
 - INICIAR_APLICACAO.bat
   Abre o sistema no dia a dia.
 
-- Iniciar Meu Financeiro UAU
+- CENTRAL UAU - INICIAR
   Atalho com icone para abrir o sistema com dois cliques.
 
-- static/img/meu-financeiro-uau-icon.ico
+- static/img/central-uau-launcher-icon.ico
   Icone usado no atalho.
 
 6. Pastas que o sistema cria ou usa
