@@ -1,0 +1,399 @@
+MANUAL COMPLETO - COMO INSTALAR E RODAR O CENTRAL UAU EM OUTRO COMPUTADOR
+
+Este manual foi escrito para pessoas sem conhecimento tecnico.
+Siga exatamente na ordem.
+
+============================================================
+1. O QUE VOCE VAI RECEBER
+============================================================
+
+Voce vai receber um arquivo compactado chamado:
+
+MeuFinanceiroUAU_PACOTE_COMPARTILHAR.zip
+
+Esse arquivo e como uma caixa fechada com o sistema dentro.
+Antes de usar, voce precisa extrair/descompactar essa caixa.
+
+============================================================
+2. BAIXAR E INSTALAR O PYTHON
+============================================================
+
+O sistema precisa do Python instalado no computador.
+Python e o programa que faz o Central UAU funcionar.
+
+PASSO 1
+Abra o navegador de internet.
+Pode ser Google Chrome, Microsoft Edge ou outro navegador.
+
+PASSO 2
+Na barra de endereco do navegador, digite:
+
+https://www.python.org/downloads/
+
+Depois aperte ENTER.
+
+PASSO 3
+Na pagina do Python, clique no botao amarelo de download.
+Ele normalmente aparece como:
+
+Download Python 3.14
+
+ou uma versao parecida do Python 3.
+
+PASSO 4
+Espere o download terminar.
+Geralmente o arquivo baixado aparece no canto superior direito do navegador
+ou na pasta Downloads do Windows.
+
+PASSO 5
+Clique duas vezes no instalador do Python que foi baixado.
+
+ATENCAO MUITO IMPORTANTE:
+Na primeira tela da instalacao, antes de clicar em Install Now,
+marque a caixinha:
+
+Add python.exe to PATH
+
+Essa caixinha costuma ficar na parte de baixo da janela.
+Ela e muito importante.
+Se nao marcar, o sistema pode nao conseguir instalar as dependencias.
+
+PASSO 6
+Depois de marcar "Add python.exe to PATH", clique em:
+
+Install Now
+
+PASSO 7
+Se o Windows perguntar se voce permite a instalacao, clique em:
+
+Sim
+
+PASSO 8
+Espere a instalacao terminar.
+Quando aparecer uma mensagem parecida com:
+
+Setup was successful
+
+clique em:
+
+Close
+
+Pronto. O Python foi instalado.
+
+============================================================
+3. DESCOMPACTAR O SISTEMA
+============================================================
+
+Agora voce precisa extrair o arquivo .zip recebido.
+
+PASSO 1
+Localize o arquivo:
+
+MeuFinanceiroUAU_PACOTE_COMPARTILHAR.zip
+
+Ele pode estar na pasta Downloads, na Area de Trabalho ou onde foi salvo.
+
+PASSO 2
+Clique com o botao direito do mouse em cima do arquivo .zip.
+
+PASSO 3
+Clique em uma opcao parecida com:
+
+Extrair Tudo...
+
+ou:
+
+Extract All...
+
+PASSO 4
+O Windows vai perguntar onde extrair.
+Pode deixar o local sugerido pelo Windows.
+
+PASSO 5
+Clique em:
+
+Extrair
+
+PASSO 6
+Espere terminar.
+No final, vai aparecer uma pasta chamada:
+
+MeuFinanceiroUAU
+
+Essa pasta e o sistema aberto.
+
+IMPORTANTE:
+Nao rode o sistema direto de dentro do .zip.
+Primeiro precisa extrair.
+
+============================================================
+4. ENTRAR NA PASTA DO SISTEMA
+============================================================
+
+PASSO 1
+Abra a pasta extraida:
+
+MeuFinanceiroUAU
+
+PASSO 2
+Dentro dela, voce deve ver alguns arquivos, entre eles:
+
+INSTALAR_DEPENDENCIAS.bat
+CENTRAL UAU - INICIAR
+CENTRAL UAU - ENCERRAR
+PASSO_A_PASSO_INSTALACAO.txt
+
+Se voce esta vendo esses arquivos, esta no lugar certo.
+
+============================================================
+5. INSTALAR AS DEPENDENCIAS DO SISTEMA
+============================================================
+
+Esse passo prepara o computador para rodar o Central UAU.
+Ele precisa ser feito apenas uma vez em cada computador.
+
+PASSO 1
+Dentro da pasta MeuFinanceiroUAU, procure o arquivo:
+
+INSTALAR_DEPENDENCIAS.bat
+
+PASSO 2
+Clique duas vezes nele.
+
+PASSO 3
+Uma janela preta pode abrir.
+Isso e normal.
+
+PASSO 4
+O sistema vai criar uma pasta chamada:
+
+venv
+
+Essa pasta guarda o ambiente do Python.
+Nao apague essa pasta depois.
+
+PASSO 5
+O instalador tambem vai baixar bibliotecas necessarias.
+Para isso, o computador precisa estar com internet.
+
+PASSO 6
+Espere ate aparecer uma mensagem parecida com:
+
+Ambiente pronto.
+Agora execute INICIAR_APLICACAO.bat para abrir o sistema.
+
+PASSO 7
+Quando terminar, aperte qualquer tecla ou feche a janela.
+
+IMPORTANTE:
+Se aparecer uma mensagem de erro dizendo "Python nao encontrado",
+provavelmente o Python nao foi instalado corretamente ou a caixinha
+"Add python.exe to PATH" nao foi marcada.
+
+Nesse caso:
+1. Instale o Python novamente.
+2. Marque "Add python.exe to PATH".
+3. Rode de novo o INSTALAR_DEPENDENCIAS.bat.
+
+============================================================
+6. ABRIR O SISTEMA CENTRAL UAU
+============================================================
+
+Depois que as dependencias foram instaladas, voce pode abrir o sistema.
+
+PASSO 1
+Dentro da pasta MeuFinanceiroUAU, procure o atalho:
+
+CENTRAL UAU - INICIAR
+
+Ele tem um icone do Central UAU com um V.
+
+PASSO 2
+Clique duas vezes nesse atalho.
+
+PASSO 3
+Uma janela pode piscar rapidamente e fechar.
+Isso e normal.
+O sistema roda em segundo plano.
+
+PASSO 4
+O navegador deve abrir sozinho.
+O endereco sera:
+
+http://127.0.0.1:5000
+
+PASSO 5
+Se o navegador nao abrir sozinho, abra o navegador manualmente,
+digite o endereco abaixo e aperte ENTER:
+
+http://127.0.0.1:5000
+
+Pronto. O sistema esta aberto.
+
+============================================================
+7. COMO USAR NO DIA A DIA
+============================================================
+
+Depois que tudo foi instalado uma vez, no dia a dia voce nao precisa
+instalar novamente.
+
+Para abrir o sistema:
+
+1. Abra a pasta MeuFinanceiroUAU.
+2. De dois cliques em:
+
+CENTRAL UAU - INICIAR
+
+3. Use o sistema no navegador.
+
+============================================================
+8. COMO ENCERRAR O SISTEMA
+============================================================
+
+Na maioria das vezes, se voce for desligar o computador,
+nao precisa encerrar manualmente.
+
+Mas se quiser parar o sistema sem desligar o computador:
+
+PASSO 1
+Abra a pasta MeuFinanceiroUAU.
+
+PASSO 2
+De dois cliques em:
+
+CENTRAL UAU - ENCERRAR
+
+Esse botao tem um X vermelho.
+
+PASSO 3
+Uma janela pode abrir rapidamente e fechar.
+Isso e normal.
+
+O sistema foi encerrado.
+
+============================================================
+9. QUANDO USAR O BOTAO DE ENCERRAR
+============================================================
+
+Use o botao CENTRAL UAU - ENCERRAR quando:
+
+- O sistema nao abrir direito.
+- O navegador mostrar erro.
+- Voce quiser fechar o sistema sem desligar o computador.
+- Voce abriu o sistema mais de uma vez.
+- A porta 5000 estiver ocupada.
+
+Depois de encerrar, voce pode abrir novamente pelo:
+
+CENTRAL UAU - INICIAR
+
+============================================================
+10. PROBLEMAS COMUNS E SOLUCOES
+============================================================
+
+PROBLEMA:
+Cliquei em CENTRAL UAU - INICIAR e nada abriu.
+
+SOLUCAO:
+Espere 10 segundos.
+Depois abra o navegador e digite:
+
+http://127.0.0.1:5000
+
+------------------------------------------------------------
+
+PROBLEMA:
+Apareceu erro dizendo que o Python nao foi encontrado.
+
+SOLUCAO:
+Instale o Python novamente e marque:
+
+Add python.exe to PATH
+
+Depois rode de novo:
+
+INSTALAR_DEPENDENCIAS.bat
+
+------------------------------------------------------------
+
+PROBLEMA:
+O INSTALAR_DEPENDENCIAS.bat deu erro baixando arquivos.
+
+SOLUCAO:
+Verifique se o computador esta conectado na internet.
+Depois rode o INSTALAR_DEPENDENCIAS.bat novamente.
+
+------------------------------------------------------------
+
+PROBLEMA:
+O sistema abriu antes, mas agora nao abre.
+
+SOLUCAO:
+1. De dois cliques em:
+   CENTRAL UAU - ENCERRAR
+
+2. Depois de alguns segundos, de dois cliques em:
+   CENTRAL UAU - INICIAR
+
+------------------------------------------------------------
+
+PROBLEMA:
+O Windows mostrou uma mensagem de seguranca.
+
+SOLUCAO:
+Se o arquivo veio de fonte confiavel, clique em:
+
+Mais informacoes
+
+e depois:
+
+Executar assim mesmo
+
+Essa mensagem pode aparecer porque o arquivo veio de outro computador.
+
+============================================================
+11. O QUE NAO APAGAR
+============================================================
+
+Nao apague estes arquivos/pastas:
+
+- app.py
+- services
+- templates
+- static
+- requirements.txt
+- venv
+- INSTALAR_DEPENDENCIAS.bat
+- CENTRAL UAU - INICIAR
+- CENTRAL UAU - ENCERRAR
+- INICIAR_APLICACAO.bat
+- PARAR_APLICACAO.bat
+
+A pasta venv aparece depois da instalacao.
+Ela e necessaria para o sistema funcionar.
+
+============================================================
+12. RESUMO RAPIDO
+============================================================
+
+Primeira vez no computador:
+
+1. Instalar Python.
+2. Marcar Add python.exe to PATH.
+3. Extrair o zip do sistema.
+4. Abrir a pasta MeuFinanceiroUAU.
+5. Dar dois cliques em INSTALAR_DEPENDENCIAS.bat.
+6. Dar dois cliques em CENTRAL UAU - INICIAR.
+
+Depois da primeira vez:
+
+1. Abrir a pasta MeuFinanceiroUAU.
+2. Dar dois cliques em CENTRAL UAU - INICIAR.
+
+Para parar:
+
+1. Dar dois cliques em CENTRAL UAU - ENCERRAR.
+
+============================================================
+FIM DO MANUAL
+============================================================
