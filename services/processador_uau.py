@@ -245,6 +245,22 @@ TERMOS_APORTE = [
     "FINANCIAMENTO",
 ]
 
+TERMOS_EXCLUSAO_RELATORIO_CLIENTE = [
+    "COOPERATIVA DE CREDITO DE LIVRE ADMISSAO DA REGIAO METROPOLITANA DE GOIANIA LTDA.",
+    "CAIXA ECONOMICA FEDERAL",
+    "FUNDO DE ARRENDADAMENTO RESIDENCIAL - FAR",
+    "HOLDING PRIME RS",
+    "SICOOB - SISTEMA DE COOPERATIVA DE CREDITO DO BRASIL",
+    "SICOOB - SISTEMA DE",
+    "HWASKAR FAGUNDES",
+    "SICOOB - SISTEMA DE COOPERATIVA DE",
+    "SPE AMAZON TOWERS II",
+    "FAGUNDES & LIMA ASSOCIADOS LTDA ME",
+    "FAGUNDES & OLIVEIRA LTDA",
+    "RANIERY SANTANA DE OLIVEIRA COSTA",
+    "COOPERATIVA DE CREDITO POUPANCA E INVESTIMENTO DO CERRADO DE GOIAS - SICREDI CERRADO GO",
+]
+
 
 # =========================
 # FUNÇÕES BÁSICAS
@@ -3541,6 +3557,53 @@ def _remover_colunas_totalmente_vazias(df: pd.DataFrame) -> pd.DataFrame:
         if sx.ne("").any():
             keep.append(c)
     return df[keep] if keep else df
+
+
+def _normalizar_texto_para_exclusao_relatorio(txt: str) -> str:
+    s = limpar_texto_nome(txt)
+    if not s:
+        return ""
+    s = re.sub(r"[^A-Z0-9]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _filtrar_clientes_excluidos_relatorio(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove apenas na exibição/exportação linhas com clientes da lista de bloqueio.
+    Não altera regras nem cálculos do motor.
+    """
+    if df is None or df.empty:
+        return df
+
+    cols_cliente = [c for c in ("Cliente", "Cliente_Base", "CLIENTE", "CLI.BASE") if c in df.columns]
+    if not cols_cliente:
+        return df
+
+    termos_norm = [
+        _normalizar_texto_para_exclusao_relatorio(t)
+        for t in TERMOS_EXCLUSAO_RELATORIO_CLIENTE
+        if str(t or "").strip()
+    ]
+    if not termos_norm:
+        return df
+
+    mask_excluir = pd.Series(False, index=df.index)
+    for col in cols_cliente:
+        cli_norm = (
+            df[col]
+            .fillna("")
+            .astype(str)
+            .map(_normalizar_texto_para_exclusao_relatorio)
+        )
+        col_mask = pd.Series(False, index=df.index)
+        for termo in termos_norm:
+            col_mask = col_mask | cli_norm.str.contains(re.escape(termo), regex=True)
+        mask_excluir = mask_excluir | col_mask
+
+    if not mask_excluir.any():
+        return df
+    return df.loc[~mask_excluir].copy()
 
 
 def _validar_integridade_financeira(consolidado_df):
@@ -9213,6 +9276,10 @@ def processar_e_gerar_excel(
     df_consolidado = _caixa_alta_exibicao_relatorio(df_consolidado)
     df_receber = _caixa_alta_exibicao_relatorio(df_receber)
     df_recebidos = _caixa_alta_exibicao_relatorio(df_recebidos)
+    df_consolidado = _filtrar_clientes_excluidos_relatorio(df_consolidado)
+    df_receber = _filtrar_clientes_excluidos_relatorio(df_receber)
+    df_recebidos = _filtrar_clientes_excluidos_relatorio(df_recebidos)
+    df_relatorio_analitico = _filtrar_clientes_excluidos_relatorio(df_relatorio_analitico)
     df_receber = _padronizar_colunas_exibicao(df_receber)
     df_recebidos = _padronizar_colunas_exibicao(df_recebidos)
     df_receber = _remover_colunas_totalmente_vazias(df_receber)
@@ -9285,6 +9352,7 @@ def processar_e_gerar_excel(
     else:
         df_pendencias_parcelas = pd.DataFrame(columns=cols_pend)
     df_pendencias_parcelas = _caixa_alta_exibicao_relatorio(df_pendencias_parcelas)
+    df_pendencias_parcelas = _filtrar_clientes_excluidos_relatorio(df_pendencias_parcelas)
     df_criterios = pd.DataFrame({
         "SEÇÃO": [
             "A. CONSOLIDADOS",
